@@ -4,6 +4,7 @@ Page({
   data: {
     view: 'HOME',
     candyCount: 20,
+    contentPaddingTop: 80, // Default padding
     history: [],
     
     // Selection & Input
@@ -44,6 +45,14 @@ Page({
   },
 
   onLoad(options) {
+    // Get Safe Area Padding from App Global Data
+    const app = getApp();
+    if (app.globalData && app.globalData.totalHeaderHeight) {
+      this.setData({
+        contentPaddingTop: app.globalData.totalHeaderHeight + 10 // Add slight buffer
+      });
+    }
+
     // Load History
     const history = wx.getStorageSync('cp_history') || [];
     this.setData({ history });
@@ -153,7 +162,7 @@ Page({
     }
   },
 
-  onWatchCandyAd() {
+  onWatchAd() {
     this.setData({ adType: 'CANDY', showAd: true, adTimeLeft: 5 });
     this.startAdTimer();
   },

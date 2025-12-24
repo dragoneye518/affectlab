@@ -1,33 +1,45 @@
 <view 
     bindtap="onSelect"
-    class="col-span-2 mt-8 mb-4 relative group cursor-pointer active-scale-95 transition-transform"
+    class="relative group cursor-pointer active-scale-95 transition-transform"
 >
     <!-- Glitchy Border Container -->
-    <view class="absolute -inset-0-5 bg-gradient-custom rounded-2xl opacity-75 group-hover-opacity-100 blur animate-tilt transition duration-1000"></view>
+    <view class="absolute -inset-0-5 bg-gradient-custom rounded-xl opacity-75 group-hover-opacity-100 blur animate-tilt transition duration-1000"></view>
     
-    <view class="relative p-6 rounded-2xl bg-black border border-white-10 overflow-hidden flex flex-col items-center text-center">
+    <!-- Main Content -->
+    <view class="relative h-20 px-4 rounded-xl bg-black border border-white-10 overflow-hidden flex items-center justify-between">
         <!-- Background Noise -->
         <view class="absolute inset-0 opacity-20 bg-noise mix-blend-overlay"></view>
         
-        <view class="relative z-10 flex flex-col items-center">
-            <view class="w-12 h-12 mx-auto rounded-full bg-white-10 flex items-center justify-center mb-3 group-hover-bg-white-20 transition-colors animate-pulse-slow">
-                <image src="https://api.iconify.design/lucide:sparkles.svg?color=%2300ffff" class="w-6 h-6" />
+        <!-- Left Side: Icon & Info -->
+        <view class="relative z-10 flex items-center gap-3">
+            <!-- Icon -->
+            <view class="w-10 h-10 rounded-full bg-white-5 border border-white-10 flex items-center justify-center group-hover-border-neon-blue-30 transition-colors flex-shrink-0">
+                <image src="https://api.iconify.design/lucide:sparkles.svg?color=%2300ffff" class="w-5 h-5 animate-pulse-slow" />
             </view>
             
-            <view class="text-xl font-black italic text-white mb-1 flex items-center justify-center gap-2">
-                <text class="text-neon-pink">&gt;_</text> 
-                发射未定义信号 
-                <text class="text-neon-pink">&lt;_</text>
-            </view>
-            <text class="text-xs text-gray-400 font-mono tracking-wider">UNIDENTIFIED SIGNAL // CUSTOM CHANNEL</text>
-            
-            <view class="mt-4 inline-flex items-center gap-2 text-xs font-bold border border-white-20 px-3 py-1-5 rounded-full text-gray-300 group-hover-border-neon-blue group-hover-text-neon-blue transition-colors">
-                <image src="https://api.iconify.design/lucide:wand-2.svg?color=%23d1d5db" class="w-3 h-3" />
-                <text>AI 信号解码接入中...</text>
+            <!-- Text Info -->
+            <view class="flex flex-col justify-center">
+                <view class="flex items-center gap-2">
+                    <text class="text-base font-black italic text-white tracking-wide">发射未定义信号</text>
+                    <!-- Mini AI Badge -->
+                    <view class="hidden sm:flex px-1.5 py-0.5 rounded bg-neon-blue-10 border border-neon-blue-30 items-center gap-0.5">
+                        <image src="https://api.iconify.design/lucide:cpu.svg?color=%2300ffff" class="w-2.5 h-2.5" />
+                        <text class="text-xs-mini font-bold text-neon-blue scale-90">AI Ready</text>
+                    </view>
+                </view>
+                <text class="text-xs-mini text-gray-500 font-mono tracking-widest scale-95 origin-left">UNIDENTIFIED SIGNAL // CUSTOM</text>
             </view>
         </view>
+
+        <!-- Right Side: Action -->
+        <view class="relative z-10 flex items-center gap-2">
+             <view class="px-2 py-1 rounded-lg bg-white-5 border border-white-10 flex items-center gap-1 group-hover-bg-neon-blue-10 group-hover-border-neon-blue-30 transition-colors">
+                <image src="https://api.iconify.design/lucide:wand-2.svg?color=%239ca3af" class="w-3 h-3 group-hover-text-neon-blue" />
+                <text class="text-xs-mini font-bold text-gray-400 group-hover-text-neon-blue">解码</text>
+             </view>
+        </view>
         
-        <!-- Glitch Overlay -->
-        <view class="absolute top-0 left-0 w-full h-1 bg-white-20 animate-glitch opacity-0 group-hover-opacity-50"></view>
+        <!-- Glitch Overlay Line -->
+        <view class="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-neon-blue to-transparent opacity-0 group-hover-opacity-100 transition-opacity"></view>
     </view>
 </view>

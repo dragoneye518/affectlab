@@ -12,6 +12,23 @@ Component({
       value: false
     }
   },
+  data: {
+    statusBarHeight: 20,
+    navBarHeight: 44,
+    menuButtonWidth: 90
+  },
+  lifetimes: {
+    attached() {
+      const app = getApp();
+      if (app.globalData.statusBarHeight) {
+        this.setData({
+          statusBarHeight: app.globalData.statusBarHeight,
+          navBarHeight: app.globalData.navBarHeight,
+          menuButtonWidth: app.globalData.menuButtonWidth
+        });
+      }
+    }
+  },
   methods: {
     goHome() {
       this.triggerEvent('setView', 'HOME');
