@@ -1,0 +1,8 @@
+{
+  "component": true,
+  "usingComponents": {
+    "holo-card": "../holo-card/holo-card",
+    "confetti": "../confetti/confetti",
+    "toast": "../toast/toast"
+  }
+}

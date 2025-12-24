@@ -1,0 +1,1 @@
+<canvas type="2d" id="confetti" class="fixed inset-0 pointer-events-none z-80 w-full h-full"></canvas>

@@ -1,0 +1,7 @@
+{
+  "name": "糖果像素 Candy Pixel",
+  "description": "不只是生图，是年轻人的情绪糖果。一键生成毒舌梗图、赛博运势、社交面具。",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

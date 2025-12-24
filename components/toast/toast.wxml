@@ -1,0 +1,4 @@
+<view class="fixed top-1-2 left-1-2 -translate-x-1-2 -translate-y-1-2 bg-black-80 backdrop-blur text-white px-6 py-3 rounded-full text-sm font-bold z-100 transition-opacity duration-300 pointer-events-none flex items-center gap-2 border border-white-20 shadow-xl {{visible ? 'opacity-100' : 'opacity-0'}}">
+    <image src="https://api.iconify.design/lucide:check-circle-2.svg?color=%2300ff00" class="w-4 h-4" />
+    <text>{{message}}</text>
+</view>

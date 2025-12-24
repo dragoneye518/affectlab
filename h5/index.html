@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>糖果像素 Candy Pixel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        neon: {
+                            pink: '#ff00ff',
+                            green: '#00ff00',
+                            blue: '#00ffff',
+                            yellow: '#ffff00',
+                            purple: '#bf00ff'
+                        },
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#121212',
+                            700: '#1a1a1a'
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slight': 'bounce-slight 2s infinite',
+                        'glitch': 'glitch 1s linear infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'spin-slow': 'spin 8s linear infinite',
+                        'shine': 'shine 3s linear infinite',
+                    },
+                    keyframes: {
+                        'bounce-slight': {
+                            '0%, 100%': { transform: 'translateY(-2%)' },
+                            '50%': { transform: 'translateY(0)' },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' },
+                        },
+                        'glitch': {
+                            '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
+                            '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
+                            '62%': { transform: 'translate(0,0) skew(5deg)' },
+                        },
+                        'shine': {
+                            '0%': { backgroundPosition: '200% center' },
+                            '100%': { backgroundPosition: '-200% center' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&family=Noto+Sans+SC:wght@400;700;900&display=swap');
+        
+        body {
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Noto Sans SC', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* Hide Scrollbar */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-text-shadow {
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.3);
+        }
+
+        .btn-neon-glow {
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 10;
+        }
+
+        .btn-neon-glow:hover {
+            box-shadow: 0 0 12px rgba(255, 0, 255, 0.5), 
+                        0 0 20px rgba(191, 0, 255, 0.3);
+            border-color: rgba(255, 0, 255, 0.8);
+            transform: translateY(-1px);
+        }
+        
+        .btn-neon-blue-glow:hover {
+             box-shadow: 0 0 12px rgba(0, 255, 255, 0.5), 
+                        0 0 20px rgba(0, 191, 255, 0.3);
+             border-color: rgba(0, 255, 255, 0.8);
+             transform: translateY(-1px);
+        }
+
+        .safe-bottom {
+            padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+        }
+
+        /* --- SSR Holographic Effects --- */
+        
+        .card-holo {
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        /* Rainbow Holo Sheen */
+        .card-holo::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                rgba(255, 0, 0, 0),
+                rgba(255, 0, 0, 0),
+                rgba(255, 255, 255, 0.1),
+                rgba(0, 255, 255, 0.2),
+                rgba(255, 0, 255, 0.2),
+                rgba(255, 255, 0, 0.2),
+                rgba(255, 0, 0, 0)
+            );
+            background-size: 50% 50%;
+            animation: bg-spin 6s linear infinite;
+            z-index: 2;
+            pointer-events: none;
+            mix-blend-mode: color-dodge;
+        }
+
+        @keyframes bg-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Golden/Rainbow Border for SSR */
+        .border-ssr {
+            position: relative;
+        }
+        .border-ssr::after {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+            z-index: -1;
+            background-size: 400%;
+            animation: glowing 20s linear infinite;
+            border-radius: 0.5rem;
+        }
+        @keyframes glowing {
+            0% { background-position: 0 0; }
+            50% { background-position: 400% 0; }
+            100% { background-position: 0 0; }
+        }
+
+        /* --- Cyber/Pixel Filters --- */
+        
+        /* 1. Pixelate Filter Class */
+        .filter-pixel {
+            filter: url(#pixelate-filter);
+        }
+
+        /* 2. Cyber Glitch Filter Class */
+        .filter-cyber-glitch {
+            filter: url('#cyber-glitch-filter') contrast(1.2) brightness(1.1) saturate(1.2);
+        }
+    </style>
+    <!-- CRITICAL: Using 'external=react,react-dom' for dependencies ensures they share the ONE instance defined here. -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.263.1?external=react,react-dom",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <!-- SVG Filters Definition -->
+    <svg style="position: absolute; width: 0; height: 0; pointer-events: none;">
+        <defs>
+            <!-- Pixelation Effect using discreteComponentTransfer -->
+            <filter id="pixelate-filter" x="0" y="0">
+                <feFlood x="2" y="2" height="2" width="2"/>
+                <feComposite width="8" height="8"/>
+                <feTile result="a"/>
+                <feComposite in="SourceGraphic" in2="a" operator="in"/>
+                <feMorphology operator="dilate" radius="2"/>
+            </filter>
+
+            <!-- Heavy Cyber Glitch Effect -->
+            <filter id="cyber-glitch-filter">
+                <!-- Split channels and shift them -->
+                <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="red"/>
+                <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="green"/>
+                <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="blue"/>
+                
+                <feOffset in="red" dx="3" dy="0" result="red_offset"/>
+                <feOffset in="blue" dx="-3" dy="0" result="blue_offset"/>
+                
+                <feBlend mode="screen" in="red_offset" in2="green" result="rg"/>
+                <feBlend mode="screen" in="rg" in2="blue_offset" result="rgb"/>
+                
+                <!-- Add heavy grain/noise for texture -->
+                <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="3" stitchTiles="stitch" result="noise"/>
+                <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.25 0" in="noise" result="noise_alpha"/>
+                
+                <feBlend mode="overlay" in="rgb" in2="noise_alpha" result="final"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+.mix-blend-overlay { mix-blend-mode: overlay; }
+.mix-blend-color-dodge { mix-blend-mode: color-dodge; }
+.will-change-transform { will-change: transform; }
+.transition-transform { transition: transform 0.2s ease-out; }

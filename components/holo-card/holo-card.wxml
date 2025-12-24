@@ -1,0 +1,22 @@
+<view 
+  class="relative transition-transform duration-200 ease-out will-change-transform {{className}}"
+  style="transform: {{transform}};"
+  bindtouchmove="handleMove"
+  bindtouchend="handleLeave"
+  bindtouchcancel="handleLeave"
+  bindtap="onClick"
+>
+  <slot></slot>
+  
+  <view 
+      class="absolute inset-0 pointer-events-none z-20 mix-blend-overlay rounded-xl"
+      style="background: radial-gradient(circle at {{shinePos.x}}% {{shinePos.y}}%, rgba(255,255,255,{{shineOpacity}}), transparent 60%);"
+  ></view>
+  
+  <block wx:if="{{rarity === 'SSR'}}">
+      <view 
+          class="absolute inset-0 pointer-events-none z-10 mix-blend-color-dodge opacity-30 rounded-xl"
+          style="background: linear-gradient(115deg, transparent 20%, #ff00ff 40%, #00ffff 60%, transparent 80%); background-size: 200% 200%; background-position: {{shinePos.x}}% {{shinePos.y}}%;"
+      ></view>
+  </block>
+</view>

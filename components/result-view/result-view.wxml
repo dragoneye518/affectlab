@@ -1,0 +1,132 @@
+<view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 animate-zoom-in overflow-y-auto overflow-x-hidden">
+  <!-- Confetti Canvas -->
+  <block wx:if="{{result.rarity === 'SSR'}}">
+      <confetti />
+      <view class="absolute inset-0 pointer-events-none bg-radial-ssr animate-pulse"></view>
+  </block>
+
+  <toast message="已保存到相册 (模拟)" visible="{{showToast}}" />
+
+  <!-- Header -->
+  <view class="flex justify-between items-center mb-2 z-10">
+      <block wx:if="{{isSharedView}}">
+           <view class="flex items-center gap-2 bg-white-10 px-3 py-1 rounded-full">
+               <image src="https://api.iconify.design/lucide:user.svg?color=%2300ffff" class="w-3 h-3" />
+               <text class="text-xs text-white">来自 <text class="text-neon-blue font-bold">{{result.userInput}}</text> 的分享</text>
+           </view>
+      </block>
+      <block wx:else>
+          <view class="w-1"></view>
+      </block>
+      
+      <view bindtap="onClose" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+          <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+      </view>
+  </view>
+
+  <view class="flex-1 flex flex-col items-center justify-center py-4">
+      <!-- Luck Score -->
+      <view class="mb-4 animate-bounce-slight select-none text-center relative">
+          <view class="absolute -right-12 -top-4 rotate-12 bg-white text-black font-black px-2 py-1 rounded shadow-white z-20 flex flex-col items-center leading-none border-2 border-neon-pink transform scale-110">
+              <text class="text-xs-mini uppercase">Luck Score</text>
+              <text class="text-2xl text-neon-pink">{{result.luckScore}}</text>
+          </view>
+          
+          <text class="text-6xl font-black italic tracking-tighter text-shadow-glow {{result.rarity === 'SSR' ? 'text-ssr' : (result.rarity === 'SR' ? 'text-neon-purple' : (result.rarity === 'R' ? 'text-neon-blue' : 'text-gray-400'))}}">
+              {{result.rarity}}
+          </text>
+          <block wx:if="{{result.rarity === 'SSR'}}">
+              <view class="text-neon-yellow text-xs font-bold tracking-widest animate-pulse mt-1">LEGENDARY</view>
+          </block>
+      </view>
+
+      <!-- Holo Card -->
+      <holo-card 
+          rarity="{{result.rarity}}" 
+          className="bg-white p-3 pb-8 rounded shadow-2xl relative group max-w-sm w-full mx-auto select-none {{result.rarity === 'SSR' ? 'border-2 border-neon-yellow' : ''}}"
+      >
+          <!-- Wrap content to handle touch for save toast -->
+          <view bindtouchstart="handleTouchStart">
+              <!-- User Input Badge -->
+              <view class="absolute -top-4 -left-2 z-20 max-w-80 transform -rotate-2">
+                  <view class="bg-yellow-300 text-black px-3 py-1-5 shadow-md border-2 border-black font-serif font-bold text-sm leading-tight break-words">
+                      "{{result.userInput}}"
+                  </view>
+              </view>
+
+              <!-- Image Area -->
+              <view class="aspect-3-4 bg-gray-100 overflow-hidden mb-4 relative border-2 border-black">
+                  <image 
+                      src="{{result.imageUrl}}" 
+                      class="w-full h-full object-cover filter-glitch" 
+                      mode="aspectFill"
+                  />
+                  <!-- Rarity Badge -->
+                  <view class="absolute top-2 right-2 z-10">
+                       <text class="px-2 py-0-5 text-xs-mini font-black italic border rounded shadow-sm {{result.rarity === 'SSR' ? 'bg-gradient-ssr text-white border-yellow-200' : (result.rarity === 'SR' ? 'bg-purple-500 text-white' : 'bg-gray-600 text-white')}}">{{result.rarity}}</text>
+                  </view>
+                  
+                  <view class="absolute bottom-2 right-2 opacity-50 z-10">
+                      <view class="flex items-center gap-1">
+                          <view class="w-8 h-8 bg-black text-white text-xs-mini flex items-center justify-center font-bold">
+                              CP
+                          </view>
+                      </view>
+                  </view>
+              </view>
+              
+              <!-- Text Content -->
+              <view class="px-2">
+                  <text class="font-serif text-2xl font-bold text-black leading-tight mb-4 tracking-tight block">
+                      "{{result.text}}"
+                  </text>
+                  <view class="flex justify-between items-end border-t-2 border-black pt-2">
+                      <view class="flex flex-col">
+                          <text class="font-black text-xs text-black uppercase tracking-widest">Candy Pixel</text>
+                          <text class="font-mono text-xs-mini text-gray-500">AI EMOTION LAB</text>
+                      </view>
+                      <text class="font-mono text-xs-mini text-gray-500">{{timestampStr}}</text>
+                  </view>
+              </view>
+          </view>
+      </holo-card>
+
+      <!-- Reroll Button (Hidden if shared view) -->
+      <block wx:if="{{!isSharedView && result.rarity !== 'SSR'}}">
+          <view class="mt-6 w-full max-w-sm">
+              <button 
+                  bindtap="onReroll"
+                  class="w-full btn-neon-glow bg-gradient-yellow border border-yellow-500-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse"
+              >
+                  <image src="https://api.iconify.design/lucide:crown.svg?color=%23fde047" class="w-4 h-4" />
+                  <text>看广告 · 逆天改命 (必出 SR/SSR)</text>
+              </button>
+          </view>
+      </block>
+
+      <view class="mt-8 text-xs-mini text-gray-600 flex items-center justify-center gap-1">
+          <image src="https://api.iconify.design/lucide:alert-triangle.svg?color=%234b5563" class="w-3 h-3" />
+          <text>AI 生成内容仅供娱乐，请勿迷信</text>
+      </view>
+  </view>
+
+  <!-- Bottom Actions -->
+  <view class="mt-2 flex gap-4 justify-center pb-8 safe-bottom z-10 w-full max-w-sm mx-auto">
+      <block wx:if="{{isSharedView}}">
+           <button bindtap="onClose" class="flex-1 btn-neon-glow bg-gradient-green text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-neon-green active-scale-95 animate-bounce">
+                <image src="https://api.iconify.design/lucide:flame.svg?color=white" class="w-4 h-4" />
+                <text>不服？我也要测 (PK)</text>
+            </button>
+      </block>
+      <block wx:else>
+          <button bindtap="onClose" class="flex-1 bg-dark-800 border border-white-20 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 active-scale-95">
+              <image src="https://api.iconify.design/lucide:refresh-cw.svg?color=white" class="w-4 h-4" />
+              <text>再来一发</text>
+          </button>
+          <button open-type="share" bindtap="onShare" class="btn-neon-glow flex-1 bg-gradient-pink-purple text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-neon-pink active-scale-95">
+              <image src="https://api.iconify.design/lucide:share-2.svg?color=white" class="w-4 h-4" />
+              <text>分享</text>
+          </button>
+      </block>
+  </view>
+</view>
