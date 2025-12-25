@@ -5,15 +5,12 @@
   <navbar 
       candyCount="{{candyCount}}" 
       canClaimDaily="{{canClaimDaily}}"
-      bind:setView="onSetView" 
       bind:watchAd="onWatchAd" 
       bind:openDaily="onOpenDaily"
   />
 
   <view class="px-4 max-w-md mx-auto relative z-10" style="padding-top: {{contentPaddingTop}}px;">
-      <!-- HOME VIEW -->
-      <block wx:if="{{view === 'HOME'}}">
-          <view class="animate-fade-in">
+      <view class="animate-fade-in">
               <!-- Countdown Banner -->
               <view class="mx-4 mb-4 p-1 rounded-xl bg-gradient-banner active-scale-95 transition-transform hover-shadow-red relative overflow-hidden group">
                   <view class="bg-black-90 backdrop-blur rounded-lg p-4 flex items-center justify-between relative z-10">
@@ -82,44 +79,8 @@
               <block wx:if="{{filteredTemplates.length === 0}}">
                   <view class="text-center py-20 opacity-50 text-sm">No signals detected.</view>
               </block>
-          </view>
-      </block>
-
-      <!-- MINE VIEW -->
-      <block wx:if="{{view === 'MINE'}}">
-          <view class="animate-slide-in-right">
-              <view class="text-2xl font-black italic mb-6 flex items-center gap-2">
-                  <image src="https://api.iconify.design/lucide:backpack.svg?color=%23ff00ff" class="w-6 h-6" />
-                  <text>INVENTORY</text>
-                  <text class="ml-auto text-sm font-normal text-gray-500">{{history.length}}</text>
-              </view>
-              
-              <block wx:if="{{history.length === 0}}">
-                  <view class="text-center py-20 opacity-50 space-y-4 flex flex-col items-center">
-                      <image src="https://api.iconify.design/lucide:backpack.svg?color=gray" class="w-12 h-12 opacity-20" />
-                      <text>Empty Inventory</text>
-                      <view bindtap="goHome" class="text-neon-blue underline">Go Explore</view>
-                  </view>
-              </block>
-              <block wx:else>
-                  <view class="grid grid-cols-2 gap-4">
-                      <block wx:for="{{history}}" wx:key="id">
-                          <view bindtap="onHistorySelect" data-item="{{item}}" class="aspect-3-4 relative rounded-xl overflow-hidden border border-white-10 active-scale-95 transition-transform">
-                              <image src="{{item.imageUrl}}" class="w-full h-full object-cover" mode="aspectFill" />
-                              <view class="absolute inset-0 bg-gradient-t-black flex flex-col justify-end p-3">
-                                  <text class="text-sm font-bold text-white line-clamp-1">{{item.text}}</text>
-                                  <text class="text-xs-mini text-gray-400">{{item.dateStr}}</text>
-                                  <view class="absolute top-2 right-2 px-2 py-0-5 text-xs-mini font-black italic border rounded bg-black-50 text-white">{{item.rarity}}</view>
-                              </view>
-                          </view>
-                      </block>
-                  </view>
-              </block>
-          </view>
-      </block>
+      </view>
   </view>
-
-  <bottom-nav view="{{view}}" bind:setView="onSetView" bind:openRadar="onOpenRadar" />
 
   <!-- OVERLAYS -->
   

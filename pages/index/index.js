@@ -1,10 +1,14 @@
 import { TEMPLATES, getThematicImage } from '../../utils/constants';
+import { ensureWallet, addLedgerEntry } from '../../utils/util';
 
 Page({
   data: {
     view: 'HOME',
     candyCount: 20,
     contentPaddingTop: 80, // Default padding
+    statusBarHeight: 20,
+    navBarHeight: 44,
+    menuButtonWidth: 90,
     history: [],
     
     // Selection & Input
@@ -44,6 +48,18 @@ Page({
     ]
   },
 
+  hideTabBarSafe() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ hidden: true });
+    }
+  },
+
+  showTabBarSafe() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ hidden: false });
+    }
+  },
+
   onLoad(options) {
     // Get Safe Area Padding from App Global Data
     const app = getApp();
@@ -65,11 +81,17 @@ Page({
     const today = new Date().toDateString();
     this.setData({ canClaimDaily: last !== today });
     
+    const wallet = ensureWallet();
+    this.setData({ candyCount: wallet.balance });
+    
     this.updateTemplates();
     this.startBannerTimer();
 
     // Check Share URL
     const params = options || wx.getLaunchOptionsSync().query;
+    if (params && params.open === 'ad') {
+      this.onWatchAd();
+    }
     const tid = params.tid;
     if (tid) {
       const t = TEMPLATES.find(temp => temp.id === tid);
@@ -94,6 +116,33 @@ Page({
     }
   },
 
+  onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 0 });
+    }
+
+    if (wx.getStorageSync('cp_open_ad_on_load')) {
+      wx.removeStorageSync('cp_open_ad_on_load');
+      this.onWatchAd();
+    }
+
+    const wallet = ensureWallet();
+    this.setData({ candyCount: wallet.balance });
+
+    const lastOpened = wx.getStorageSync('cp_last_opened_result');
+    if (lastOpened) {
+      lastOpened.dateStr = new Date(lastOpened.timestamp).toLocaleDateString();
+      this.setData({ generatedResult: lastOpened, view: 'RESULT' }, () => {
+        this.hideTabBarSafe();
+      });
+      wx.removeStorageSync('cp_last_opened_result');
+    } else {
+      if (this.data.view !== 'RESULT' && !this.data.sharedResult) {
+        this.showTabBarSafe();
+      }
+    }
+  },
+
   onShowShareOverlay() {
     this.setData({ showShare: true });
   },
@@ -104,6 +153,7 @@ Page({
 
   closeSharedResult() {
     this.setData({ sharedResult: null, view: 'HOME' });
+    this.showTabBarSafe();
   },
 
   preventTouchMove() {},
@@ -137,14 +187,6 @@ Page({
     this.setData({ filteredTemplates: filtered });
   },
 
-  onSetView(e) {
-    this.setData({ view: e.detail });
-  },
-  
-  goHome() {
-    this.setData({ view: 'HOME' });
-  },
-
   onOpenDaily() {
     this.setData({ showSignIn: true });
   },
@@ -155,11 +197,9 @@ Page({
   
   onClaimDaily() {
     if (this.data.canClaimDaily) {
-      this.setData({
-        candyCount: this.data.candyCount + 10,
-        canClaimDaily: false,
-        showSignIn: false
-      });
+      const wallet = addLedgerEntry({ amount: 10, type: 'DAILY' });
+      this.setData({ candyCount: wallet.balance });
+      this.setData({ canClaimDaily: false, showSignIn: false });
       wx.setStorageSync('cp_last_signin', new Date().toDateString());
       wx.showToast({ title: '领取成功', icon: 'none' });
     }
@@ -185,9 +225,17 @@ Page({
     clearInterval(this.adTimer);
     this.setData({ showAd: false });
     if (this.data.adType === 'CANDY') {
-      this.setData({ candyCount: this.data.candyCount + 10 });
+      const wallet = addLedgerEntry({ amount: 10, type: 'AD' });
+      this.setData({ candyCount: wallet.balance });
       wx.showToast({ title: '糖果 +10', icon: 'none' });
+
+      const nextUrl = wx.getStorageSync('cp_after_ad_redirect');
+      if (nextUrl) {
+        wx.removeStorageSync('cp_after_ad_redirect');
+        wx.redirectTo({ url: nextUrl });
+      }
     } else if (this.data.adType === 'REROLL') {
+      addLedgerEntry({ amount: 0, type: 'REROLL' });
       if (this.data.selectedTemplate && this.data.userInput) {
         this.setData({ view: 'GENERATING' });
       }
@@ -219,10 +267,16 @@ Page({
       wx.showToast({ title: '糖果不足，看广告补充', icon: 'none' });
       return;
     }
+
+    const wallet = addLedgerEntry({
+      amount: -selectedTemplate.cost,
+      type: 'SPEND',
+      meta: { templateId: selectedTemplate.id, templateTitle: selectedTemplate.title, cost: selectedTemplate.cost }
+    });
     
     this.setData({
       userInput: text,
-      candyCount: candyCount - selectedTemplate.cost,
+      candyCount: wallet.balance,
       isInputting: false,
       view: 'GENERATING'
     });
@@ -242,29 +296,23 @@ Page({
       generatedResult: res,
       history: newHistory,
       view: 'RESULT'
+    }, () => {
+      this.hideTabBarSafe();
     });
     wx.setStorageSync('cp_history', newHistory);
   },
   
   closeResult() {
     this.setData({ view: 'HOME' });
+    this.showTabBarSafe();
   },
   
   startReroll() {
     this.setData({ adType: 'REROLL', showAd: true, adTimeLeft: 5 });
     this.startAdTimer();
   },
-  
-  onHistorySelect(e) {
-    const item = e.currentTarget.dataset.item;
-    // Format dateStr for display if needed or rely on component
-    item.dateStr = new Date(item.timestamp).toLocaleDateString();
-    this.setData({ generatedResult: item, view: 'RESULT' });
-  },
 
-  // Radar / Filter Logic
   onOpenRadar() {
-    // Snapshot current state for cancel reversion
     this.setData({ 
       showCategory: true,
       _tempCategoryFilter: this.data.categoryFilter,
@@ -277,7 +325,6 @@ Page({
   },
 
   onRadarCancel() {
-    // Revert changes
     this.setData({
       categoryFilter: this.data._tempCategoryFilter,
       searchTerm: this.data._tempSearchTerm,
@@ -287,7 +334,6 @@ Page({
   },
 
   onRadarConfirm() {
-    // Confirm changes (already applied to data)
     this.setData({ showCategory: false });
   },
   

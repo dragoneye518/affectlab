@@ -10,13 +10,16 @@ Component({
   },
   methods: {
     goHome() {
-      this.triggerEvent('setView', 'HOME');
+      if (this.data.view === 'HOME') return;
+      wx.switchTab({ url: '/pages/index/index' });
     },
-    goMine() {
-      this.triggerEvent('setView', 'MINE');
+    goPack() {
+      if (this.data.view === 'PACK') return;
+      wx.switchTab({ url: '/pages/pack/pack' });
     },
-    onOpenRadar() {
-      this.triggerEvent('openRadar');
+    goProfile() {
+      if (this.data.view === 'PROFILE') return;
+      wx.switchTab({ url: '/pages/profile/profile' });
     }
   }
 })

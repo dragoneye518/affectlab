@@ -1,0 +1,19 @@
+<view class="tabbar" wx:if="{{!hidden}}">
+  <view class="tabbar__content">
+    <view class="tabbar__item {{selected === 0 ? 'is-active' : ''}}" data-index="0" data-path="/pages/index/index" bindtap="onSwitchTab">
+      <view wx:if="{{selected === 0}}" class="tabbar__dot tabbar__dot--capsule"></view>
+      <image class="tabbar__icon" src="{{selected === 0 ? 'https://api.iconify.design/lucide:pill.svg?color=%23ffff00' : 'https://api.iconify.design/lucide:pill.svg?color=%239ca3af'}}" />
+      <text class="tabbar__text {{selected === 0 ? 'is-active' : ''}}">胶囊</text>
+    </view>
+    <view class="tabbar__item {{selected === 1 ? 'is-active' : ''}}" data-index="1" data-path="/pages/pack/pack" bindtap="onSwitchTab">
+      <view wx:if="{{selected === 1}}" class="tabbar__dot tabbar__dot--pack"></view>
+      <image class="tabbar__icon" src="{{selected === 1 ? 'https://api.iconify.design/lucide:backpack.svg?color=%23ff00ff' : 'https://api.iconify.design/lucide:backpack.svg?color=%239ca3af'}}" />
+      <text class="tabbar__text {{selected === 1 ? 'is-active' : ''}}">背包</text>
+    </view>
+    <view class="tabbar__item {{selected === 2 ? 'is-active' : ''}}" data-index="2" data-path="/pages/profile/profile" bindtap="onSwitchTab">
+      <view wx:if="{{selected === 2}}" class="tabbar__dot tabbar__dot--profile"></view>
+      <image class="tabbar__icon" src="{{selected === 2 ? 'https://api.iconify.design/lucide:user.svg?color=%2300ff00' : 'https://api.iconify.design/lucide:user.svg?color=%239ca3af'}}" />
+      <text class="tabbar__text {{selected === 2 ? 'is-active' : ''}}">我的</text>
+    </view>
+  </view>
+</view>

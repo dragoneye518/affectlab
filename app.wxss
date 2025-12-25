@@ -164,7 +164,7 @@ view, scroll-view, swiper, button, input, textarea, label, navigator, image {
 .mb-2 { margin-bottom: 16rpx; }
 .mb-4 { margin-bottom: 32rpx; }
 .mb-6 { margin-bottom: 48rpx; }
-.mb-7 { margin-bottom: 86rpx; }
+.mb-7 { margin-bottom: 56rpx; }
 .mb-8 { margin-bottom: 64rpx; }
 .mb-12 { margin-bottom: 96rpx; }
 .mt-8 { margin-top: 64rpx; }

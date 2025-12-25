@@ -1,0 +1,54 @@
+<view class="min-h-screen bg-black text-white font-sans pb-6 relative safe-bottom">
+  <view class="fixed inset-0 pointer-events-none z-0 opacity-10 bg-stardust"></view>
+
+  <view class="fixed top-0 left-0 right-0 z-50 bg-dark-900-90 backdrop-blur border-b border-white-10" style="padding-top: {{statusBarHeight}}px;">
+    <view class="flex items-center px-4 h-full" style="height: {{navBarHeight}}px; padding-right: {{menuButtonWidth + 8}}px;">
+      <view bindtap="goBack" class="flex items-center gap-2 active-opacity">
+        <image src="https://api.iconify.design/lucide:arrow-left.svg?color=white" class="w-5 h-5" />
+        <text class="font-black italic tracking-widest text-white">{{title}}</text>
+      </view>
+      <view class="ml-auto flex items-center gap-2">
+        <view class="flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white-5 border-white-10">
+          <image src="https://api.iconify.design/lucide:candy.svg?color=%23ffff00" class="w-3 h-3" />
+          <text class="font-mono font-bold text-xs min-w-8 text-center text-neon-yellow">{{candyCount}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="px-4 max-w-md mx-auto relative z-10" style="padding-top: {{contentPaddingTop}}px;">
+    <view class="rounded-2xl border border-white-10 bg-dark-800 p-1 flex mb-6">
+      <view
+        bindtap="setMode"
+        data-mode="credit"
+        class="flex-1 py-3 rounded-xl text-center text-sm font-bold active-scale-95 transition-all {{mode === 'credit' ? 'bg-neon-green text-black' : 'bg-transparent text-gray-400'}}"
+      >
+        充值
+      </view>
+      <view
+        bindtap="setMode"
+        data-mode="debit"
+        class="flex-1 py-3 rounded-xl text-center text-sm font-bold active-scale-95 transition-all {{mode === 'debit' ? 'bg-neon-pink text-white' : 'bg-transparent text-gray-400'}}"
+      >
+        消费
+      </view>
+    </view>
+
+    <block wx:if="{{items.length === 0}}">
+      <view class="p-6 rounded-2xl border border-white-10 bg-dark-800 text-center text-sm text-gray-500">暂无记录</view>
+    </block>
+    <block wx:else>
+      <view class="rounded-2xl border border-white-10 bg-dark-800 overflow-hidden">
+        <block wx:for="{{items}}" wx:key="id">
+          <view class="flex items-center justify-between px-4 py-4 border-b border-white-5">
+            <view class="flex flex-col">
+              <text class="text-sm font-bold text-white">{{item.title}}</text>
+              <text class="text-xs-mini text-gray-500 font-mono">{{item.sub}}</text>
+            </view>
+            <text class="text-sm font-black font-mono {{item.amount > 0 ? 'text-neon-green' : 'text-neon-pink'}}">{{item.amount > 0 ? '+' : ''}}{{item.amount}}</text>
+          </view>
+        </block>
+      </view>
+    </block>
+  </view>
+</view>

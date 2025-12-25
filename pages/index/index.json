@@ -1,7 +1,6 @@
 {
   "usingComponents": {
     "navbar": "../../components/navbar/navbar",
-    "bottom-nav": "../../components/bottom-nav/bottom-nav",
     "template-card": "../../components/template-card/template-card",
     "custom-entry-card": "../../components/custom-entry-card/custom-entry-card",
     "input-overlay": "../../components/input-overlay/input-overlay",
@@ -9,5 +8,6 @@
     "result-view": "../../components/result-view/result-view",
     "share-overlay": "../../components/share-overlay/share-overlay"
   },
-  "navigationStyle": "custom"
+  "navigationStyle": "custom",
+  "disableSwipeBack": true
 }

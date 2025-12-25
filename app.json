@@ -1,6 +1,9 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/pack/pack",
+    "pages/profile/profile",
+    "pages/ledger/ledger"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -11,5 +14,22 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "tabBar": {
+    "custom": true,
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "胶囊"
+      },
+      {
+        "pagePath": "pages/pack/pack",
+        "text": "背包"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  }
 }

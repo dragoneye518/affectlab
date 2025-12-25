@@ -9,26 +9,22 @@
       <text class="text-xs font-bold">胶囊</text>
     </view>
     
-    <!-- Radar (Center) -->
-    <view class="relative -top-5">
-      <view 
-         bindtap="onOpenRadar" 
-         class="btn-neon-glow group w-14 h-14 bg-dark-900 rounded-full flex items-center justify-center border-4 border-dark-900 shadow-ring active-scale-90 transition-transform overflow-hidden relative"
-      >
-        <view class="absolute inset-0 bg-gradient-pink-purple opacity-100"></view>
-        <view class="absolute inset-0 bg-conic-spin animate-spin-slow opacity-50"></view>
-        <image src="https://api.iconify.design/lucide:radar.svg?color=white" class="w-6 h-6 relative z-10" />
-      </view>
-      <text class="absolute -bottom-4 left-1-2 -translate-x-1-2 text-xs font-bold text-gray-400 w-full text-center">雷达</text>
+    <!-- Backpack Tab -->
+    <view 
+      bindtap="goPack"
+      class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'PACK' ? 'text-neon-pink' : 'text-gray-500'}}"
+    >
+      <image src="https://api.iconify.design/lucide:backpack.svg?color=%23{{view === 'PACK' ? 'ff00ff' : '6b7280'}}" class="w-6 h-6" />
+      <text class="text-xs font-bold">背包</text>
     </view>
 
-    <!-- Mine Tab -->
+    <!-- Profile Tab -->
     <view 
-      bindtap="goMine"
-      class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'MINE' ? 'text-neon-pink' : 'text-gray-500'}}"
+      bindtap="goProfile"
+      class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'PROFILE' ? 'text-neon-green' : 'text-gray-500'}}"
     >
-      <image src="https://api.iconify.design/lucide:backpack.svg?color=%23{{view === 'MINE' ? 'ff00ff' : '6b7280'}}" class="w-6 h-6" />
-      <text class="text-xs font-bold">背包</text>
+      <image src="https://api.iconify.design/lucide:user.svg?color=%23{{view === 'PROFILE' ? '00ff00' : '6b7280'}}" class="w-6 h-6" />
+      <text class="text-xs font-bold">我的</text>
     </view>
   </view>
 </view>

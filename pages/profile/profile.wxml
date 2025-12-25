@@ -1,0 +1,84 @@
+<view class="min-h-screen bg-black text-white font-sans pb-20 relative">
+  <view class="fixed inset-0 pointer-events-none z-0 opacity-10 bg-stardust"></view>
+
+  <view class="fixed top-0 left-0 right-0 z-50 bg-dark-900-90 backdrop-blur border-b border-white-10" style="padding-top: {{statusBarHeight}}px;">
+    <view class="flex items-center px-4 h-full" style="height: {{navBarHeight}}px; padding-right: {{menuButtonWidth + 8}}px;">
+      <view class="flex items-center gap-2">
+        <image src="https://api.iconify.design/lucide:user.svg?color=%2300ff00" class="w-5 h-5" />
+        <text class="font-black italic tracking-widest text-white">我的</text>
+      </view>
+      <view class="ml-auto flex items-center gap-2">
+        <view class="flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white-5 border-white-10">
+          <image src="https://api.iconify.design/lucide:candy.svg?color=%23ffff00" class="w-3 h-3" />
+          <text class="font-mono font-bold text-xs min-w-8 text-center text-neon-yellow">{{candyCount}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="px-4 max-w-md mx-auto relative z-10" style="padding-top: {{contentPaddingTop}}px;">
+    <view class="animate-fade-in">
+      <view class="rounded-2xl border border-white-10 bg-dark-800 p-6 mb-6">
+        <view class="text-xs text-gray-500 tracking-widest uppercase font-bold">算力余额</view>
+        <view class="flex items-end gap-2 mt-2">
+          <text class="text-4xl font-black text-neon-yellow font-mono">{{candyCount}}</text>
+          <text class="text-sm text-gray-500 font-mono mb-1">CANDY</text>
+        </view>
+        <view class="flex gap-3 mt-4">
+          <view bindtap="onOpenDaily" class="flex-1 py-3 rounded-xl border {{canClaimDaily ? 'border-neon-yellow-50 bg-neon-yellow-10 text-neon-yellow' : 'border-white-10 bg-white-5 text-gray-500'}} text-sm font-bold active-scale-95 transition-all flex items-center justify-center">
+            每日补给
+          </view>
+          <view bindtap="onWatchAd" class="flex-1 py-3 rounded-xl border border-neon-purple-50 bg-gradient-purple-pink text-white text-sm font-bold active-scale-95 transition-all flex items-center justify-center">
+            看广告 +10
+          </view>
+        </view>
+      </view>
+
+      <view class="grid grid-cols-2 gap-4 mb-6">
+        <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+          <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-2">总充值</view>
+          <text class="text-xl font-black text-white font-mono">{{summary.totalCredit}}</text>
+        </view>
+        <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+          <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-2">总消费</view>
+          <text class="text-xl font-black text-white font-mono">{{summary.totalDebit}}</text>
+        </view>
+        <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+          <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-2">广告补给</view>
+          <text class="text-xl font-black text-white font-mono">{{summary.adCount}}</text>
+        </view>
+        <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+          <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-2">生成次数</view>
+          <text class="text-xl font-black text-white font-mono">{{summary.generateCount}}</text>
+        </view>
+      </view>
+
+      <view class="rounded-2xl border border-white-10 bg-dark-800 overflow-hidden mb-6">
+        <view class="px-4 py-3 border-b border-white-10">
+          <text class="text-sm font-bold tracking-widest text-gray-300">明细</text>
+        </view>
+        <view class="p-4 grid grid-cols-2 gap-3">
+          <view bindtap="goCreditDetail" class="py-4 rounded-xl border border-white-10 bg-white-5 active-scale-95 transition-all flex flex-col items-start">
+            <text class="text-sm font-bold text-white">充值明细</text>
+            <text class="text-xs-mini text-gray-500 font-mono mt-1">AD / DAILY</text>
+          </view>
+          <view bindtap="goDebitDetail" class="py-4 rounded-xl border border-white-10 bg-white-5 active-scale-95 transition-all flex flex-col items-start">
+            <text class="text-sm font-bold text-white">消费明细</text>
+            <text class="text-xs-mini text-gray-500 font-mono mt-1">GENERATE</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="rounded-2xl border border-white-10 bg-dark-800 overflow-hidden">
+        <view class="px-4 py-3 border-b border-white-10 flex items-center justify-between">
+          <text class="text-sm font-bold tracking-widest text-gray-300">数据</text>
+          <view bindtap="onClearLedger" class="text-xs text-gray-500 underline active-opacity">清空记录</view>
+        </view>
+        <view class="p-4">
+          <view class="text-sm text-gray-500">记录仅保存在本机，用于解释“算力从哪来、花到哪去”。</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+</view>

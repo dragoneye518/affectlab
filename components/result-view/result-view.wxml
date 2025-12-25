@@ -1,4 +1,4 @@
-<view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 animate-zoom-in overflow-y-auto overflow-x-hidden">
+<view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 animate-zoom-in overflow-y-auto overflow-x-hidden" style="z-index: 300;">
   <!-- Confetti Canvas -->
   <block wx:if="{{result.rarity === 'SSR'}}">
       <confetti />
@@ -96,7 +96,7 @@
           <view class="mt-6 w-full max-w-sm">
               <button 
                   bindtap="onReroll"
-                  class="w-full btn-neon-glow bg-gradient-yellow border border-yellow-500-50 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse"
+                  class="w-full btn-neon-glow bg-gradient-yellow border border-yellow-500-50 text-white py-2 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg animate-pulse"
               >
                   <image src="https://api.iconify.design/lucide:crown.svg?color=%23fde047" class="w-4 h-4" />
                   <text>看广告 · 逆天改命 (必出 SR/SSR)</text>
@@ -111,7 +111,7 @@
   </view>
 
   <!-- Bottom Actions -->
-  <view class="mt-2 flex gap-4 justify-center pb-8 safe-bottom z-10 w-full max-w-sm mx-auto">
+  <view class="mt-2 flex gap-4 justify-center pb-20 z-10 w-full max-w-sm mx-auto">
       <block wx:if="{{isSharedView}}">
            <button bindtap="onClose" class="flex-1 btn-neon-glow bg-gradient-green text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-neon-green active-scale-95 animate-bounce">
                 <image src="https://api.iconify.design/lucide:flame.svg?color=white" class="w-4 h-4" />
