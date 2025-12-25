@@ -276,6 +276,7 @@ view, scroll-view, swiper, button, input, textarea, label, navigator, image {
 .bg-neon-pink { background-color: var(--neon-pink); }
 .bg-neon-pink-10 { background-color: rgba(255, 0, 255, 0.1); }
 .bg-neon-pink-30 { background-color: rgba(255, 0, 255, 0.3); }
+.bg-neon-blue { background-color: var(--neon-blue); }
 .bg-neon-blue-10 { background-color: rgba(0, 255, 255, 0.1); }
 .bg-neon-blue-20 { background-color: rgba(0, 255, 255, 0.2); }
 .bg-neon-blue-30 { background-color: rgba(0, 255, 255, 0.3); }

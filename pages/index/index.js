@@ -49,7 +49,10 @@ Page({
     const app = getApp();
     if (app.globalData && app.globalData.totalHeaderHeight) {
       this.setData({
-        contentPaddingTop: app.globalData.totalHeaderHeight + 10 // Add slight buffer
+        contentPaddingTop: app.globalData.totalHeaderHeight + 10, // Add slight buffer
+        statusBarHeight: app.globalData.statusBarHeight,
+        navBarHeight: app.globalData.navBarHeight,
+        menuButtonWidth: app.globalData.menuButtonWidth
       });
     }
 
@@ -261,21 +264,41 @@ Page({
 
   // Radar / Filter Logic
   onOpenRadar() {
-    this.setData({ showCategory: true });
+    // Snapshot current state for cancel reversion
+    this.setData({ 
+      showCategory: true,
+      _tempCategoryFilter: this.data.categoryFilter,
+      _tempSearchTerm: this.data.searchTerm
+    });
   },
   
   closeRadar() {
     this.setData({ showCategory: false });
   },
+
+  onRadarCancel() {
+    // Revert changes
+    this.setData({
+      categoryFilter: this.data._tempCategoryFilter,
+      searchTerm: this.data._tempSearchTerm,
+      showCategory: false
+    });
+    this.updateTemplates();
+  },
+
+  onRadarConfirm() {
+    // Confirm changes (already applied to data)
+    this.setData({ showCategory: false });
+  },
   
   onSelectCategory(e) {
-    this.setData({ categoryFilter: e.currentTarget.dataset.id, searchTerm: '', showCategory: false });
+    this.setData({ categoryFilter: e.currentTarget.dataset.id, searchTerm: '' });
     this.updateTemplates();
   },
   
   onTagSearch(e) {
     const tag = e.currentTarget.dataset.tag.replace('#', '');
-    this.setData({ searchTerm: tag, categoryFilter: null, showCategory: false });
+    this.setData({ searchTerm: tag, categoryFilter: null });
     this.updateTemplates();
   },
   
@@ -291,7 +314,7 @@ Page({
   },
   
   resetRadar() {
-    this.setData({ searchTerm: '', categoryFilter: null, showCategory: false });
+    this.setData({ searchTerm: '', categoryFilter: null });
     this.updateTemplates();
   },
   
