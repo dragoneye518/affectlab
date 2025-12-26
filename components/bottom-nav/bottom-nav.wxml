@@ -5,7 +5,7 @@
       bindtap="goHome"
       class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'HOME' ? 'text-neon-blue' : 'text-gray-500'}}"
     >
-      <image src="https://api.iconify.design/lucide:layout-grid.svg?color=%23{{view === 'HOME' ? '00ffff' : '6b7280'}}" class="w-6 h-6" />
+      <image src="{{view === 'HOME' ? 'https://api.iconify.design/lucide:layout-grid.svg?color=%2300ffff' : 'https://api.iconify.design/lucide:layout-grid.svg?color=%236b7280'}}" class="w-6 h-6" />
       <text class="text-xs font-bold">胶囊</text>
     </view>
     
@@ -14,7 +14,7 @@
       bindtap="goPack"
       class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'PACK' ? 'text-neon-pink' : 'text-gray-500'}}"
     >
-      <image src="https://api.iconify.design/lucide:backpack.svg?color=%23{{view === 'PACK' ? 'ff00ff' : '6b7280'}}" class="w-6 h-6" />
+      <image src="{{view === 'PACK' ? 'https://api.iconify.design/lucide:backpack.svg?color=%23ff00ff' : 'https://api.iconify.design/lucide:backpack.svg?color=%236b7280'}}" class="w-6 h-6" />
       <text class="text-xs font-bold">背包</text>
     </view>
 
@@ -23,7 +23,7 @@
       bindtap="goProfile"
       class="flex flex-col items-center gap-1 transition-colors active-scale-90 duration-200 {{view === 'PROFILE' ? 'text-neon-green' : 'text-gray-500'}}"
     >
-      <image src="https://api.iconify.design/lucide:user.svg?color=%23{{view === 'PROFILE' ? '00ff00' : '6b7280'}}" class="w-6 h-6" />
+      <image src="{{view === 'PROFILE' ? 'https://api.iconify.design/lucide:user.svg?color=%2300ff00' : 'https://api.iconify.design/lucide:user.svg?color=%236b7280'}}" class="w-6 h-6" />
       <text class="text-xs font-bold">我的</text>
     </view>
   </view>

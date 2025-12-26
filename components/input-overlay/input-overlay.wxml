@@ -83,7 +83,7 @@
                   bindtap="handleAIPolish"
                   class="flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-all {{!input ? 'opacity-50 border-transparent text-gray-500' : 'border-neon-purple-50 text-neon-purple bg-neon-purple-10'}}"
               >
-                  <image src="https://api.iconify.design/lucide:wand-2.svg?color=%23{{isPolishing ? 'bf00ff' : 'bf00ff'}}" class="w-3 h-3 {{isPolishing ? 'animate-spin' : ''}}" />
+                  <image src="https://api.iconify.design/lucide:wand-2.svg?color=%23bf00ff" class="w-3 h-3 {{isPolishing ? 'animate-spin' : ''}}" />
                   <text>{{isPolishing ? "DECODING..." : "AI 信号转译"}}</text>
               </view>
           </view>

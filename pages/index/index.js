@@ -1,10 +1,11 @@
-import { TEMPLATES, getThematicImage } from '../../utils/constants';
-import { ensureWallet, addLedgerEntry } from '../../utils/util';
+import { requestAffectLab, getAffectLabToken, affectLabLogin, fetchAffectLabTemplates } from '../../utils/api';
+
+let _warnedEmptyTemplates = false;
 
 Page({
   data: {
     view: 'HOME',
-    candyCount: 20,
+    candyCount: 0,
     contentPaddingTop: 80, // Default padding
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -26,18 +27,24 @@ Page({
     showCategory: false,
     
     // Filters
+    templates: [],
     filteredTemplates: [],
     categoryFilter: null,
     searchTerm: "",
+    templatesLoading: false,
+    templatesLoadError: "",
     
     // Daily
     canClaimDaily: false,
+
+    pendingShareParams: null,
     
     // Banner Timer
     timeLeft: { d: '00', h: '00', m: '00', s: '00' },
     
     // Ad Timer
     adTimeLeft: 5,
+    freeGenerateOnce: false,
 
     // Categories Data
     categories: [
@@ -61,59 +68,99 @@ Page({
   },
 
   onLoad(options) {
+    try {
+      console.log('Index onLoad', { ts: Date.now() });
+    } catch (e) {}
     // Get Safe Area Padding from App Global Data
     const app = getApp();
     if (app.globalData && app.globalData.totalHeaderHeight) {
+      const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+      const th = Number(app.globalData.totalHeaderHeight);
+      const sb = Number(app.globalData.statusBarHeight);
+      const nb = Number(app.globalData.navBarHeight);
+      const mbw = Number(app.globalData.menuButtonWidth);
       this.setData({
-        contentPaddingTop: app.globalData.totalHeaderHeight + 10, // Add slight buffer
-        statusBarHeight: app.globalData.statusBarHeight,
-        navBarHeight: app.globalData.navBarHeight,
-        menuButtonWidth: app.globalData.menuButtonWidth
+        contentPaddingTop: Number.isFinite(th) ? clamp(th + 10, 56, 180) : 80,
+        statusBarHeight: Number.isFinite(sb) ? clamp(sb, 0, 80) : 20,
+        navBarHeight: Number.isFinite(nb) ? clamp(nb, 32, 120) : 44,
+        menuButtonWidth: Number.isFinite(mbw) ? clamp(mbw, 60, 240) : 90
       });
     }
 
-    // Load History
-    const history = wx.getStorageSync('cp_history') || [];
-    this.setData({ history });
+    affectLabLogin().finally(() => {
+      this.refreshMeFromServer();
+    });
     
-    // Check Daily
-    const last = wx.getStorageSync('cp_last_signin');
-    const today = new Date().toDateString();
-    this.setData({ canClaimDaily: last !== today });
-    
-    const wallet = ensureWallet();
-    this.setData({ candyCount: wallet.balance });
-    
-    this.updateTemplates();
+    const params = options || wx.getLaunchOptionsSync().query;
+    const tid = params && params.tid;
+    const u = params && params.u;
+    const r = params && params.r;
+    const s = params && params.s;
+    if (tid && u && r) {
+      this.setData({ pendingShareParams: { tid, u, r, s } });
+    }
+
+    this.loadTemplates();
     this.startBannerTimer();
 
     // Check Share URL
-    const params = options || wx.getLaunchOptionsSync().query;
     if (params && params.open === 'ad') {
       this.onWatchAd();
     }
-    const tid = params.tid;
-    if (tid) {
-      const t = TEMPLATES.find(temp => temp.id === tid);
-      const u = params.u;
-      const r = params.r;
-      const s = params.s;
-      if (t && u && r) {
-        this.setData({
-          sharedResult: {
-            id: 'shared',
-            templateId: tid,
-            imageUrl: getThematicImage(tid, r),
-            text: t.presetTexts[0], // Simplified
-            userInput: u,
-            timestamp: Date.now(),
-            rarity: r,
-            filterSeed: 0,
-            luckScore: s ? parseInt(s) : 80
-          }
-        });
-      }
+    this.applyPendingShareParams();
+  },
+
+  getTemplateById(templateId) {
+    const list = this.data.templates || [];
+    return list.find(t => t.id === templateId) || null;
+  },
+
+  async loadTemplates() {
+    this.setData({ templatesLoading: true, templatesLoadError: "" });
+    let list = [];
+    try {
+      list = await fetchAffectLabTemplates();
+    } catch (e) {
+      list = [];
+      this.setData({ templatesLoadError: '模板加载失败，请检查后端服务' });
     }
+    const next = Array.isArray(list) ? list : [];
+    this.setData({ templates: next, templatesLoading: false }, () => {
+      this.updateTemplates();
+      this.applyPendingShareParams();
+      if (next.length === 0 && !_warnedEmptyTemplates) {
+        _warnedEmptyTemplates = true;
+        try {
+          wx.showToast({ title: '暂无模板数据，请检查后端模板落库/接口', icon: 'none' });
+        } catch (e) {}
+      }
+    });
+  },
+
+  applyPendingShareParams() {
+    const p = this.data.pendingShareParams;
+    if (!p) return;
+    const t = this.getTemplateById(p.tid);
+    if (!t) return;
+
+    const assets = t.assets || {};
+    const img = (assets && assets[p.r]) ? assets[p.r] : '';
+    const presetTexts = Array.isArray(t.presetTexts) ? t.presetTexts : [];
+
+    this.setData({
+      sharedResult: {
+        id: 'shared',
+        templateId: p.tid,
+        imageUrl: img,
+        text: presetTexts[0] || t.title,
+        userInput: decodeURIComponent(p.u),
+        timestamp: Date.now(),
+        rarity: p.r,
+        filterSeed: 0,
+        luckScore: p.s ? parseInt(p.s) : 80
+      },
+      pendingShareParams: null
+    });
   },
 
   onShow() {
@@ -126,8 +173,7 @@ Page({
       this.onWatchAd();
     }
 
-    const wallet = ensureWallet();
-    this.setData({ candyCount: wallet.balance });
+    this.refreshBalanceFromServer();
 
     const lastOpened = wx.getStorageSync('cp_last_opened_result');
     if (lastOpened) {
@@ -174,12 +220,13 @@ Page({
 
   updateTemplates() {
     const { categoryFilter, searchTerm } = this.data;
-    const filtered = TEMPLATES.filter(t => {
+    const source = this.data.templates || [];
+    const filtered = source.filter(t => {
       if (t.id === 'custom-signal') return false;
       const matchCat = categoryFilter ? t.category === categoryFilter : true;
       const matchSearch = searchTerm ? (
         t.title.includes(searchTerm) || 
-        t.keywords.some(k => k.includes(searchTerm)) ||
+        (Array.isArray(t.keywords) ? t.keywords : []).some(k => String(k || '').includes(searchTerm)) ||
         t.tag === searchTerm
       ) : true;
       return matchCat && matchSearch;
@@ -195,13 +242,20 @@ Page({
     this.setData({ showSignIn: false });
   },
   
-  onClaimDaily() {
+    onClaimDaily() {
     if (this.data.canClaimDaily) {
-      const wallet = addLedgerEntry({ amount: 10, type: 'DAILY' });
-      this.setData({ candyCount: wallet.balance });
-      this.setData({ canClaimDaily: false, showSignIn: false });
-      wx.setStorageSync('cp_last_signin', new Date().toDateString());
-      wx.showToast({ title: '领取成功', icon: 'none' });
+      requestAffectLab({ path: '/user/reward/daily', method: 'POST', data: {} })
+        .then((res) => {
+          const bal = res?.data?.data?.balance;
+          if (typeof bal === 'number') {
+            this.setData({ candyCount: bal });
+          }
+          this.setData({ canClaimDaily: false, showSignIn: false });
+          wx.showToast({ title: '领取成功', icon: 'none' });
+        })
+        .catch(() => {
+          wx.showToast({ title: '领取失败，无可用数据', icon: 'none' });
+        });
     }
   },
 
@@ -225,9 +279,17 @@ Page({
     clearInterval(this.adTimer);
     this.setData({ showAd: false });
     if (this.data.adType === 'CANDY') {
-      const wallet = addLedgerEntry({ amount: 10, type: 'AD' });
-      this.setData({ candyCount: wallet.balance });
-      wx.showToast({ title: '糖果 +10', icon: 'none' });
+      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { amount: 10 } })
+        .then((res) => {
+          const bal = res?.data?.data?.balance;
+          if (typeof bal === 'number') {
+            this.setData({ candyCount: bal });
+          }
+          wx.showToast({ title: '糖果 +10', icon: 'none' });
+        })
+        .catch(() => {
+          wx.showToast({ title: '领取失败，请检查后端服务', icon: 'none' });
+        });
 
       const nextUrl = wx.getStorageSync('cp_after_ad_redirect');
       if (nextUrl) {
@@ -235,9 +297,8 @@ Page({
         wx.redirectTo({ url: nextUrl });
       }
     } else if (this.data.adType === 'REROLL') {
-      addLedgerEntry({ amount: 0, type: 'REROLL' });
       if (this.data.selectedTemplate && this.data.userInput) {
-        this.setData({ view: 'GENERATING' });
+        this.setData({ view: 'GENERATING', freeGenerateOnce: true });
       }
     }
   },
@@ -247,7 +308,7 @@ Page({
   },
   
   onCustomSignalSelect() {
-    const custom = TEMPLATES.find(t => t.id === 'custom-signal');
+    const custom = this.getTemplateById('custom-signal');
     if (custom) {
       this.setData({ selectedTemplate: custom, isInputting: true });
     }
@@ -257,7 +318,7 @@ Page({
     this.setData({ isInputting: false });
   },
   
-  onInputConfirm(e) {
+  async onInputConfirm(e) {
     const text = e.detail.text;
     const { selectedTemplate, candyCount } = this.data;
     
@@ -267,23 +328,22 @@ Page({
       wx.showToast({ title: '糖果不足，看广告补充', icon: 'none' });
       return;
     }
+    if (!getAffectLabToken()) await affectLabLogin();
+    if (!getAffectLabToken()) {
+      wx.showToast({ title: '登录失败，请检查后端服务', icon: 'none' });
+      return;
+    }
 
-    const wallet = addLedgerEntry({
-      amount: -selectedTemplate.cost,
-      type: 'SPEND',
-      meta: { templateId: selectedTemplate.id, templateTitle: selectedTemplate.title, cost: selectedTemplate.cost }
-    });
-    
     this.setData({
       userInput: text,
-      candyCount: wallet.balance,
       isInputting: false,
-      view: 'GENERATING'
+      view: 'GENERATING',
+      freeGenerateOnce: false
     });
   },
   
   onSwitchTemplate(e) {
-    const target = TEMPLATES.find(t => t.id === e.detail.templateId);
+    const target = this.getTemplateById(e.detail.templateId);
     if (target) {
       this.setData({ selectedTemplate: target });
     }
@@ -291,25 +351,70 @@ Page({
 
   onGenerationFinish(e) {
     const res = e.detail.result;
-    const newHistory = [res, ...this.data.history];
     this.setData({
       generatedResult: res,
-      history: newHistory,
-      view: 'RESULT'
+      view: 'RESULT',
+      freeGenerateOnce: false
     }, () => {
       this.hideTabBarSafe();
     });
-    wx.setStorageSync('cp_history', newHistory);
+    this.refreshBalanceFromServer();
+  },
+
+  onGenerationError(e) {
+    this.setData({ view: 'HOME', freeGenerateOnce: false });
+    this.showTabBarSafe();
+    wx.showToast({ title: e?.detail?.message || '生成失败，请检查后端服务', icon: 'none' });
+  },
+
+  onGenerateInsufficient() {
+    this.setData({
+      view: 'HOME',
+      adType: 'CANDY',
+      showAd: true,
+      adTimeLeft: 5,
+      freeGenerateOnce: false
+    });
+    this.startAdTimer();
+    this.showTabBarSafe();
+    wx.showToast({ title: '糖果不足，看广告补充', icon: 'none' });
   },
   
   closeResult() {
-    this.setData({ view: 'HOME' });
+    this.setData({ view: 'HOME', freeGenerateOnce: false });
     this.showTabBarSafe();
   },
   
   startReroll() {
     this.setData({ adType: 'REROLL', showAd: true, adTimeLeft: 5 });
     this.startAdTimer();
+  },
+
+  refreshBalanceFromServer() {
+    if (!getAffectLabToken()) return;
+    requestAffectLab({ path: '/user/balance', method: 'GET' })
+      .then((res) => {
+        const bal = res?.data?.data?.balance;
+        if (typeof bal === 'number') {
+          this.setData({ candyCount: bal });
+        }
+      })
+      .catch(() => {});
+  },
+
+  refreshMeFromServer() {
+    if (!getAffectLabToken()) return;
+    requestAffectLab({ path: '/user/me', method: 'GET' })
+      .then((res) => {
+        const bal = Number(res?.data?.data?.balance?.balance);
+        const lastDailyDate = res?.data?.data?.balance?.last_daily_date;
+        if (!Number.isNaN(bal)) {
+          this.setData({ candyCount: bal });
+        }
+        const today = new Date().toISOString().slice(0, 10);
+        this.setData({ canClaimDaily: lastDailyDate !== today });
+      })
+      .catch(() => {});
   },
 
   onOpenRadar() {

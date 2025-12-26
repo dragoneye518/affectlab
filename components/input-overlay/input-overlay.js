@@ -1,5 +1,4 @@
-import { polishTextWithDeepSeek } from '../../utils/api';
-import { TEMPLATES } from '../../utils/constants';
+import { polishTextWithDeepSeek, fetchAffectLabTemplates } from '../../utils/api';
 
 Component({
   options: {
@@ -56,12 +55,19 @@ Component({
       
       const result = await polishTextWithDeepSeek(this.data.input);
       
+      if (!result || !Array.isArray(result.options) || result.options.length === 0) {
+        wx.showToast({ title: 'AI 转译失败，无可用数据', icon: 'none' });
+        this.setData({ isPolishing: false });
+        return;
+      }
+
       if (result) {
         let recommendedId = null;
         let recommendedTemplateName = '';
         
         if (result.recommendedTemplateId && result.recommendedTemplateId !== this.properties.template.id) {
-           const exists = TEMPLATES.find(t => t.id === result.recommendedTemplateId);
+           const templates = await fetchAffectLabTemplates();
+           const exists = templates.find(t => t.id === result.recommendedTemplateId);
            if (exists) {
              recommendedId = exists.id;
              recommendedTemplateName = exists.title;

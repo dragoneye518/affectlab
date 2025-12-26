@@ -72,10 +72,9 @@
       <view class="rounded-2xl border border-white-10 bg-dark-800 overflow-hidden">
         <view class="px-4 py-3 border-b border-white-10 flex items-center justify-between">
           <text class="text-sm font-bold tracking-widest text-gray-300">数据</text>
-          <view bindtap="onClearLedger" class="text-xs text-gray-500 underline active-opacity">清空记录</view>
         </view>
         <view class="p-4">
-          <view class="text-sm text-gray-500">记录仅保存在本机，用于解释“算力从哪来、花到哪去”。</view>
+          <view class="text-sm text-gray-500">数据以服务器 MySQL 记录为准。</view>
         </view>
       </view>
     </view>

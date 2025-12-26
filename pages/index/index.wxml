@@ -44,7 +44,7 @@
                       bindtap="onOpenRadar" 
                       class="flex-shrink-0 w-12 h-12 rounded-xl border flex items-center justify-center active-scale-95 transition-transform {{categoryFilter ? 'bg-neon-pink text-white border-neon-pink' : 'bg-dark-800 border-white-10 text-neon-pink'}}"
                   >
-                      <image src="https://api.iconify.design/lucide:radar.svg?color=%23{{categoryFilter ? 'ffffff' : 'ff00ff'}}" class="w-5 h-5" />
+                      <image src="{{categoryFilter ? 'https://api.iconify.design/lucide:radar.svg?color=%23ffffff' : 'https://api.iconify.design/lucide:radar.svg?color=%23ff00ff'}}" class="w-5 h-5" />
                   </view>
                   
                   <block wx:if="{{categoryFilter || searchTerm}}">
@@ -76,6 +76,14 @@
                 </block>
             </view>
               
+              <block wx:if="{{templatesLoading}}">
+                  <view class="text-center py-20 opacity-50 text-sm">正在加载模板...</view>
+              </block>
+
+              <block wx:if="{{!templatesLoading && templatesLoadError}}">
+                  <view class="text-center py-20 opacity-50 text-sm">{{templatesLoadError}}</view>
+              </block>
+
               <block wx:if="{{filteredTemplates.length === 0}}">
                   <view class="text-center py-20 opacity-50 text-sm">No signals detected.</view>
               </block>
@@ -258,7 +266,10 @@
       <generating-view 
           template="{{selectedTemplate}}" 
           userInput="{{userInput}}" 
-          bind:finish="onGenerationFinish" 
+          freeGenerateOnce="{{freeGenerateOnce}}"
+          bind:finish="onGenerationFinish"
+          bind:insufficient="onGenerateInsufficient"
+          bind:error="onGenerationError"
       />
   </block>
 

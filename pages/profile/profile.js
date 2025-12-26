@@ -1,4 +1,4 @@
-import { ensureWallet, computeWalletSummary, clearWalletLedger, addLedgerEntry } from '../../utils/util';
+import { requestAffectLab, getAffectLabToken, affectLabLogin } from '../../utils/api';
 
 Page({
   data: {
@@ -28,13 +28,57 @@ Page({
       this.getTabBar().setData({ selected: 2 });
     }
 
-    const last = wx.getStorageSync('cp_last_signin');
-    const today = new Date().toDateString();
-    this.setData({ canClaimDaily: last !== today });
+    const load = async () => {
+      const today = new Date().toISOString().slice(0, 10);
 
-    const wallet = ensureWallet();
-    const summary = computeWalletSummary(wallet.ledger);
-    this.setData({ candyCount: wallet.balance, summary });
+      if (!getAffectLabToken()) await affectLabLogin();
+      if (!getAffectLabToken()) {
+        wx.showToast({ title: '登录失败，无可用数据', icon: 'none' });
+        return;
+      }
+
+      requestAffectLab({ path: '/user/me', method: 'GET' })
+        .then((res) => {
+          const bal = res?.data?.data?.balance?.balance;
+          const lastDailyDate = res?.data?.data?.balance?.last_daily_date;
+          if (typeof bal === 'number') {
+            this.setData({ candyCount: bal });
+          }
+          this.setData({ canClaimDaily: lastDailyDate !== today });
+        })
+        .catch(() => {
+          wx.showToast({ title: '加载失败，无可用数据', icon: 'none' });
+        });
+
+      requestAffectLab({ path: '/user/transactions?limit=200&offset=0', method: 'GET' })
+        .then((res) => {
+          const items = res?.data?.data?.items;
+          if (!Array.isArray(items)) {
+            this.setData({ summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 } });
+            return;
+          }
+          let totalCredit = 0;
+          let totalDebit = 0;
+          let adCount = 0;
+          let dailyCount = 0;
+          let generateCount = 0;
+          for (const it of items) {
+            const amt = Number(it.amount || 0);
+            if (amt > 0) totalCredit += amt;
+            if (amt < 0) totalDebit += Math.abs(amt);
+            if (it.reason === 'AD' || it.type === 'RECHARGE' && it.reason === 'AD') adCount += 1;
+            if (it.reason === 'DAILY' || it.type === 'RECHARGE' && it.reason === 'DAILY') dailyCount += 1;
+            if (it.type === 'CONSUME') generateCount += 1;
+          }
+          this.setData({ summary: { totalCredit, totalDebit, adCount, dailyCount, generateCount } });
+        })
+        .catch(() => {
+          this.setData({ summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 } });
+          wx.showToast({ title: '明细加载失败，无可用数据', icon: 'none' });
+        });
+    };
+
+    load();
   },
 
   goCreditDetail() {
@@ -45,19 +89,22 @@ Page({
     wx.navigateTo({ url: '/pages/ledger/ledger?mode=debit' });
   },
 
-  onClearLedger() {
-    const next = clearWalletLedger();
-    const summary = computeWalletSummary(next.ledger);
-    this.setData({ candyCount: next.balance, summary });
-  },
-
   onOpenDaily() {
     if (!this.data.canClaimDaily) return;
-    const wallet = addLedgerEntry({ amount: 10, type: 'DAILY' });
-    wx.setStorageSync('cp_last_signin', new Date().toDateString());
-    const summary = computeWalletSummary(wallet.ledger);
-    this.setData({ canClaimDaily: false, candyCount: wallet.balance, summary });
-    wx.showToast({ title: '领取成功', icon: 'none' });
+    if (!getAffectLabToken()) return;
+    requestAffectLab({ path: '/user/reward/daily', method: 'POST', data: {} })
+      .then((res) => {
+        const bal = res?.data?.data?.balance;
+        if (typeof bal === 'number') {
+          this.setData({ canClaimDaily: false, candyCount: bal });
+          wx.showToast({ title: '领取成功', icon: 'none' });
+          return;
+        }
+        wx.showToast({ title: '领取失败，无可用数据', icon: 'none' });
+      })
+      .catch(() => {
+        wx.showToast({ title: '领取失败，无可用数据', icon: 'none' });
+      });
   },
 
   onWatchAd() {

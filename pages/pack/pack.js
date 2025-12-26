@@ -1,4 +1,4 @@
-import { ensureWallet } from '../../utils/util';
+import { requestAffectLab, getAffectLabToken, affectLabLogin } from '../../utils/api';
 
 Page({
   data: {
@@ -28,14 +28,37 @@ Page({
       this.getTabBar().setData({ selected: 1 });
     }
 
-    const history = wx.getStorageSync('cp_history') || [];
-    for (const item of history) {
-      item.dateStr = new Date(item.timestamp).toLocaleDateString();
-    }
-    this.setData({ history });
+    this.setData({ history: [] });
 
-    const wallet = ensureWallet();
-    this.setData({ candyCount: wallet.balance });
+    const load = async () => {
+      if (!getAffectLabToken()) await affectLabLogin();
+      if (!getAffectLabToken()) {
+        wx.showToast({ title: '登录失败，请检查后端服务', icon: 'none' });
+        return;
+      }
+      requestAffectLab({ path: '/user/balance', method: 'GET' })
+        .then((res) => {
+          const bal = res?.data?.data?.balance;
+          if (typeof bal === 'number') this.setData({ candyCount: bal });
+        })
+        .catch(() => {});
+      requestAffectLab({ path: '/cards', method: 'GET' })
+        .then((res) => {
+          const items = res?.data?.data?.items;
+          if (res.statusCode === 200 && Array.isArray(items)) {
+            for (const item of items) {
+              item.dateStr = new Date(item.timestamp).toLocaleDateString();
+            }
+            this.setData({ history: items });
+          } else {
+            wx.showToast({ title: '加载失败，请检查后端服务', icon: 'none' });
+          }
+        })
+        .catch(() => {
+          wx.showToast({ title: '加载失败，请检查后端服务', icon: 'none' });
+        });
+    };
+    load();
   },
 
   onHistorySelect(e) {

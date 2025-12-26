@@ -1,5 +1,4 @@
-import { generateHash } from '../../utils/util';
-import { getThematicImage } from '../../utils/constants';
+import { requestAffectLab } from '../../utils/api';
 
 Component({
   options: {
@@ -7,7 +6,11 @@ Component({
   },
   properties: {
     template: Object,
-    userInput: String
+    userInput: String,
+    freeGenerateOnce: {
+      type: Boolean,
+      value: false
+    }
   },
   data: {
     logs: [],
@@ -62,50 +65,28 @@ Component({
       clearTimeout(this.finishTimeout);
     },
     finish() {
-      const { template, userInput } = this.properties;
-      const hash = generateHash(userInput + template.id);
-      
-      let finalMainText = "";
-      if (template.id === 'custom-signal') {
-          finalMainText = userInput;
-      } else {
-          finalMainText = template.presetTexts[hash % template.presetTexts.length];
-      }
-
-      // Rarity Logic
-      const rand = Math.random();
-      let rarity = 'N';
-      let luckScore = 0;
-
-      if (rand > 0.80) {
-          rarity = 'SSR';
-          luckScore = 95 + Math.floor(Math.random() * 6); 
-      } else if (rand > 0.40) {
-          rarity = 'SR';
-          luckScore = 80 + Math.floor(Math.random() * 15);
-      } else if (rand > 0.20) {
-          rarity = 'R';
-          luckScore = 60 + Math.floor(Math.random() * 20);
-      } else {
-          rarity = 'N';
-          luckScore = Math.floor(Math.random() * 60);
-      }
-
-      const raritySpecificImage = getThematicImage(template.id, rarity);
-
-      const result = {
-          id: Date.now().toString(),
-          templateId: template.id,
-          imageUrl: raritySpecificImage,
-          text: finalMainText,
-          userInput: userInput,
-          timestamp: Date.now(),
-          rarity,
-          filterSeed: hash % 360,
-          luckScore
-      };
-      
-      this.triggerEvent('finish', { result });
+      const { template, userInput, freeGenerateOnce } = this.properties;
+      requestAffectLab({
+        path: '/cards/generate',
+        method: 'POST',
+        data: { templateId: template.id, userInput, free: !!freeGenerateOnce }
+      })
+        .then((res) => {
+          if (res && res.statusCode === 400 && res.data && res.data.detail === 'Insufficient Balance') {
+            this.triggerEvent('insufficient', {});
+            return;
+          }
+          const result = res?.data?.data?.result;
+          if (res.statusCode === 200 && result) {
+            this.triggerEvent('finish', { result, fromServer: true });
+            return;
+          }
+          const message = (res && res.data && (res.data.detail || res.data.msg)) || '生成失败，请检查后端服务';
+          this.triggerEvent('error', { message, statusCode: res?.statusCode });
+        })
+        .catch(() => {
+          this.triggerEvent('error', { message: '生成失败，请检查后端服务' });
+        });
     }
   }
 })

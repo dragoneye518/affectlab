@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 ENV_DATABASE_URL = os.environ.get('DATABASE_URL')
 
 # MySQL 配置（仅在未显式提供 DATABASE_URL 时使用）
-MYSQL_HOST = os.getenv('MYSQL_HOST', '192.168.3.36')
+MYSQL_HOST = os.getenv('MYSQL_HOST', '127.0.0.1')
 MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))
-MYSQL_USER = os.getenv('MYSQL_USER', 'longyan')
-MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'Mate@1688')
-MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'candy_pixel_ai')
+MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'affect_lab')
 
 # URL Encode Password
 encoded_password = quote_plus(MYSQL_PASSWORD)
@@ -47,7 +47,10 @@ try:
     # Test Connection
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    logger.info(f"✓ 已连接到数据库: {EFFECTIVE_DB_URL}")
+    try:
+        logger.info(f"✓ 已连接到数据库: {engine.url.render_as_string(hide_password=True)}")
+    except Exception:
+        logger.info("✓ 已连接到数据库")
 except Exception as e:
     logger.error(f"✗ 无法连接到MySQL数据库: {e}")
     # CRITICAL: Do NOT fall back to SQLite
