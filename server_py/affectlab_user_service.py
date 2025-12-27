@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 
 import jwt
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -319,6 +319,8 @@ class LoginRequest(BaseModel):
 
 class RewardRequest(BaseModel):
     amount: int | None = None
+    scene: str | None = None
+    templateId: str | None = None
 
 
 def _create_token(user_id: int) -> str:
@@ -526,8 +528,13 @@ def login(req: LoginRequest, db=Depends(get_db)):
         _insert_third_party_account(db, third_party_table, user_id, openid, req.userInfo)
 
         db.execute(
-            text("INSERT IGNORE INTO affectlab_user_balance(user_id, balance) VALUES (:uid, :bal)"),
-            {"uid": user_id, "bal": 20},
+            text(
+                """
+                INSERT IGNORE INTO affectlab_user_balance(user_id, balance, total_recharge, total_consume)
+                VALUES (:uid, :bal, :tr, 0)
+                """
+            ),
+            {"uid": user_id, "bal": 20, "tr": 20},
         )
         _insert_user_transaction(
             db,
@@ -571,6 +578,33 @@ def me(request: Request, db=Depends(get_db)):
         text("SELECT balance, total_recharge, total_consume, last_daily_date FROM affectlab_user_balance WHERE user_id = :uid"),
         {"uid": user_id},
     ).mappings().first()
+    if bal:
+        sums = db.execute(
+            text(
+                """
+                SELECT
+                  COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS tr,
+                  COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS tc
+                FROM user_transactions
+                WHERE user_id = :uid
+                """
+            ),
+            {"uid": user_id},
+        ).mappings().first()
+        tr = int((sums or {}).get("tr") or 0)
+        tc = int((sums or {}).get("tc") or 0)
+        cur_tr = int(bal.get("total_recharge") or 0)
+        cur_tc = int(bal.get("total_consume") or 0)
+        if tr != cur_tr or tc != cur_tc:
+            db.execute(
+                text("UPDATE affectlab_user_balance SET total_recharge = :tr, total_consume = :tc WHERE user_id = :uid"),
+                {"tr": tr, "tc": tc, "uid": user_id},
+            )
+            db.commit()
+            bal = db.execute(
+                text("SELECT balance, total_recharge, total_consume, last_daily_date FROM affectlab_user_balance WHERE user_id = :uid"),
+                {"uid": user_id},
+            ).mappings().first()
     logger.info("DB read user_me user_id=%s", int(user_id or 0))
     return {"code": 200, "data": {"user": dict(user), "balance": dict(bal) if bal else {"balance": 0}}}
 
@@ -587,8 +621,17 @@ def balance(request: Request, db=Depends(get_db)):
 
 
 @router.get("/affectlab/api/user/transactions")
-def transactions(request: Request, limit: int = 50, offset: int = 0, db=Depends(get_db)):
+def transactions(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    tx_type: str | None = Query(None, alias="type"),
+    db=Depends(get_db),
+):
     user_id = get_current_user_id(request)
+    t = (tx_type or "").strip().upper()
+    if t and t not in ("RECHARGE", "CONSUME", "REROLL"):
+        raise HTTPException(status_code=400, detail="Invalid type")
     rows = (
         db.execute(
             text(
@@ -596,11 +639,12 @@ def transactions(request: Request, limit: int = 50, offset: int = 0, db=Depends(
                 SELECT id, amount, type, reason, project_id, balance_after, created_at
                 FROM user_transactions
                 WHERE user_id = :uid
+                  AND (:t = '' OR type = :t)
                 ORDER BY created_at DESC, id DESC
                 LIMIT :lim OFFSET :off
                 """
             ),
-            {"uid": user_id, "lim": max(1, min(limit, 200)), "off": max(0, offset)},
+            {"uid": user_id, "t": t, "lim": max(1, min(limit, 200)), "off": max(0, offset)},
         )
         .mappings()
         .all()
@@ -614,28 +658,29 @@ def claim_daily(request: Request, db=Depends(get_db)):
     user_id = get_current_user_id(request)
     tz = datetime.timezone(datetime.timedelta(hours=8))
     today = datetime.datetime.now(tz).date().isoformat()
+    daily_amount = int(os.getenv("AFFECTLAB_DAILY_REWARD_AMOUNT", "10") or "10")
     rec = _get_balance_for_update(db, user_id)
     if rec.get("last_daily_date") == today:
         logger.info("DB write daily reward denied user_id=%s date=%s", int(user_id or 0), today)
         raise HTTPException(status_code=400, detail="Already claimed")
     curr = int(rec.get("balance") or 0)
-    next_balance = curr + 10
+    next_balance = curr + daily_amount
     db.execute(
         text(
             """
             UPDATE affectlab_user_balance
             SET balance = :bal,
-                total_recharge = total_recharge + 10,
+                total_recharge = total_recharge + :amt,
                 last_daily_date = :d
             WHERE user_id = :uid
             """
         ),
-        {"bal": next_balance, "d": today, "uid": user_id},
+        {"bal": next_balance, "amt": daily_amount, "d": today, "uid": user_id},
     )
     _insert_user_transaction(
         db,
         user_id=user_id,
-        amount=10,
+        amount=daily_amount,
         tx_type="RECHARGE",
         reason="DAILY",
         project_id=None,
@@ -643,13 +688,37 @@ def claim_daily(request: Request, db=Depends(get_db)):
     )
     db.commit()
     logger.info("DB write daily reward user_id=%s date=%s balance_after=%s", int(user_id or 0), today, int(next_balance or 0))
-    return {"code": 200, "data": {"balance": int(next_balance)}}
+    return {"code": 200, "data": {"balance": int(next_balance), "amount": int(daily_amount)}}
 
 
 @router.post("/affectlab/api/user/reward/ad")
 def reward_ad(req: RewardRequest, request: Request, db=Depends(get_db)):
     user_id = get_current_user_id(request)
-    amount = int(req.amount or 10)
-    next_balance = recharge_points_internal(db, user_id, amount, "AD")
-    logger.info("DB write ad reward user_id=%s amount=%s balance_after=%s", int(user_id or 0), int(amount or 0), int(next_balance or 0))
-    return {"code": 200, "data": {"balance": int(next_balance)}}
+    scene = (req.scene or "").strip().upper()
+    ad_amount = int(os.getenv("AFFECTLAB_AD_REWARD_AMOUNT", "10") or "10")
+
+    amount = ad_amount
+    reason = "AD"
+    project_id = None
+
+    if scene == "REROLL":
+        tid = (req.templateId or "").strip()
+        cost = None
+        if tid:
+            cost = db.execute(
+                text("SELECT cost FROM affectlab_emotion_template WHERE template_id = :tid LIMIT 1"),
+                {"tid": tid},
+            ).scalar()
+        amount = int(cost or 1)
+        reason = "AD_REROLL"
+        project_id = tid or None
+
+    next_balance = recharge_points_internal(db, user_id, amount, reason, project_id=project_id)
+    logger.info(
+        "DB write ad reward user_id=%s scene=%s amount=%s balance_after=%s",
+        int(user_id or 0),
+        scene or "CANDY",
+        int(amount or 0),
+        int(next_balance or 0),
+    )
+    return {"code": 200, "data": {"balance": int(next_balance), "amount": int(amount), "reason": reason}}

@@ -10,6 +10,10 @@ Component({
     freeGenerateOnce: {
       type: Boolean,
       value: false
+    },
+    rerollBoostOnce: {
+      type: Boolean,
+      value: false
     }
   },
   data: {
@@ -68,11 +72,11 @@ Component({
     finish() {
       if (this._requested) return;
       this._requested = true;
-      const { template, userInput, freeGenerateOnce } = this.properties;
+      const { template, userInput, freeGenerateOnce, rerollBoostOnce } = this.properties;
       requestAffectLab({
         path: '/cards/generate',
         method: 'POST',
-        data: { templateId: template.id, userInput, free: !!freeGenerateOnce }
+        data: { templateId: template.id, userInput, free: !!freeGenerateOnce, reroll: !!rerollBoostOnce }
       })
         .then((res) => {
           if (res && res.statusCode === 400 && res.data && res.data.detail === 'Insufficient Balance') {

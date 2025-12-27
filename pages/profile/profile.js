@@ -66,8 +66,8 @@ Page({
             const amt = Number(it.amount || 0);
             if (amt > 0) totalCredit += amt;
             if (amt < 0) totalDebit += Math.abs(amt);
-            if (it.reason === 'AD' || it.type === 'RECHARGE' && it.reason === 'AD') adCount += 1;
-            if (it.reason === 'DAILY' || it.type === 'RECHARGE' && it.reason === 'DAILY') dailyCount += 1;
+            if (it.reason === 'AD' || it.reason === 'AD_REROLL') adCount += 1;
+            if (it.reason === 'DAILY') dailyCount += 1;
             if (it.type === 'CONSUME') generateCount += 1;
           }
           this.setData({ summary: { totalCredit, totalDebit, adCount, dailyCount, generateCount } });

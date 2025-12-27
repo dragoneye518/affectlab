@@ -46,6 +46,8 @@ Page({
     // Ad Timer
     adTimeLeft: 5,
     freeGenerateOnce: false,
+    rerollBoostOnce: false,
+    adTemplateId: null,
 
     // Categories Data
     categories: [
@@ -280,13 +282,14 @@ Page({
     clearInterval(this.adTimer);
     this.setData({ showAd: false });
     if (this.data.adType === 'CANDY') {
-      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { amount: 10 } })
+      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { scene: 'CANDY' } })
         .then((res) => {
           const bal = res?.data?.data?.balance;
+          const amt = res?.data?.data?.amount;
           if (typeof bal === 'number') {
             this.setData({ candyCount: bal });
           }
-          wx.showToast({ title: '糖果 +10', icon: 'none' });
+          wx.showToast({ title: `算力 +${typeof amt === 'number' ? amt : 10}`, icon: 'none' });
         })
         .catch(() => {
           wx.showToast({ title: '领取失败，请检查后端服务', icon: 'none' });
@@ -298,9 +301,21 @@ Page({
         wx.redirectTo({ url: nextUrl });
       }
     } else if (this.data.adType === 'REROLL') {
-      if (this.data.selectedTemplate && this.data.userInput) {
-        this.setData({ view: 'GENERATING', freeGenerateOnce: true });
-      }
+      const tid = this.data.adTemplateId || this.data.selectedTemplate?.id || this.data.generatedResult?.templateId;
+      if (!tid || !this.data.selectedTemplate || !this.data.userInput) return;
+      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { scene: 'REROLL', templateId: tid } })
+        .then((res) => {
+          const bal = res?.data?.data?.balance;
+          const amt = res?.data?.data?.amount;
+          if (typeof bal === 'number') {
+            this.setData({ candyCount: bal });
+          }
+          wx.showToast({ title: `重抽补贴 +${typeof amt === 'number' ? amt : 1}`, icon: 'none' });
+          this.setData({ view: 'GENERATING', rerollBoostOnce: true, freeGenerateOnce: false });
+        })
+        .catch(() => {
+          wx.showToast({ title: '重抽补贴领取失败，请检查后端服务', icon: 'none' });
+        });
     }
   },
 
@@ -358,6 +373,7 @@ Page({
       view: 'RESULT',
       resultReadOnly: false,
       freeGenerateOnce: false,
+      rerollBoostOnce: false,
       candyCount: typeof balance === 'number' ? balance : this.data.candyCount
     }, () => {
       this.hideTabBarSafe();
@@ -366,7 +382,7 @@ Page({
   },
 
   onGenerationError(e) {
-    this.setData({ view: 'HOME', freeGenerateOnce: false });
+    this.setData({ view: 'HOME', freeGenerateOnce: false, rerollBoostOnce: false });
     this.showTabBarSafe();
     wx.showToast({ title: e?.detail?.message || '生成失败，请检查后端服务', icon: 'none' });
   },
@@ -377,7 +393,8 @@ Page({
       adType: 'CANDY',
       showAd: true,
       adTimeLeft: 5,
-      freeGenerateOnce: false
+      freeGenerateOnce: false,
+      rerollBoostOnce: false
     });
     this.startAdTimer();
     this.showTabBarSafe();
@@ -385,12 +402,13 @@ Page({
   },
   
   closeResult() {
-    this.setData({ view: 'HOME', freeGenerateOnce: false, resultReadOnly: false });
+    this.setData({ view: 'HOME', freeGenerateOnce: false, rerollBoostOnce: false, resultReadOnly: false, adTemplateId: null });
     this.showTabBarSafe();
   },
   
   startReroll() {
-    this.setData({ adType: 'REROLL', showAd: true, adTimeLeft: 5 });
+    const tid = this.data.generatedResult?.templateId || this.data.selectedTemplate?.id || null;
+    this.setData({ adType: 'REROLL', showAd: true, adTimeLeft: 5, adTemplateId: tid });
     this.startAdTimer();
   },
 

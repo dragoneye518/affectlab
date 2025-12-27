@@ -647,6 +647,7 @@ class GenerateRequest(BaseModel):
     templateId: str
     userInput: str
     free: bool | None = None
+    reroll: bool | None = None
 
 
 @app.post("/affectlab/api/cards/generate")
@@ -673,7 +674,9 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
 
     cost = int(tpl.get("cost") or 1)
     record_id = f"al_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
-    cost_points = 0 if req.free else cost
+    is_free = bool(req.free)
+    is_reroll = bool(req.reroll)
+    cost_points = 0 if is_free else cost
     balance_after = None
     rarity = "N"
     luck_score = 0
@@ -682,7 +685,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     content_text = None
     filter_seed = 0
     try:
-        if req.free:
+        if is_free:
             db.execute(
                 text("INSERT IGNORE INTO affectlab_user_balance(user_id, balance) VALUES (:uid, 0)"),
                 {"uid": user_id},
@@ -699,10 +702,17 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
                 balance_after=balance_after,
             )
         else:
-            balance_after = deduct_points_internal(db, user_id, cost, reason="GENERATE", project_id=record_id, commit=False)
+            balance_after = deduct_points_internal(
+                db,
+                user_id,
+                cost,
+                reason="REROLL_GENERATE" if is_reroll else "GENERATE",
+                project_id=record_id,
+                commit=False,
+            )
 
         rarity, luck_score = _pick_rarity()
-        if req.free and rarity in ("N", "R"):
+        if (is_free or is_reroll) and rarity in ("N", "R"):
             rarity, luck_score = _pick_reroll_rarity()
 
         if req.templateId == "custom-signal":
@@ -772,7 +782,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
                 "score": int(luck_score),
                 "img": image_url,
                 "cost": cost_points,
-                "meta": json.dumps({"filterSeed": filter_seed}, ensure_ascii=False),
+                "meta": json.dumps({"filterSeed": filter_seed, "reroll": bool(is_reroll), "free": bool(is_free)}, ensure_ascii=False),
             },
         )
         db.commit()

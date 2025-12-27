@@ -60,11 +60,11 @@
         <view class="p-4 grid grid-cols-2 gap-3">
           <view bindtap="goCreditDetail" class="py-4 rounded-xl border border-white-10 bg-white-5 active-scale-95 transition-all flex flex-col items-start">
             <text class="text-sm font-bold text-white">充值明细</text>
-            <text class="text-xs-mini text-gray-500 font-mono mt-1">AD / DAILY</text>
+            <text class="text-xs-mini text-gray-500 mt-1">广告补给 / 每日补给</text>
           </view>
           <view bindtap="goDebitDetail" class="py-4 rounded-xl border border-white-10 bg-white-5 active-scale-95 transition-all flex flex-col items-start">
             <text class="text-sm font-bold text-white">消费明细</text>
-            <text class="text-xs-mini text-gray-500 font-mono mt-1">GENERATE</text>
+            <text class="text-xs-mini text-gray-500 mt-1">生成 / 重抽</text>
           </view>
         </view>
       </view>

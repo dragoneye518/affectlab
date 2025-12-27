@@ -267,6 +267,7 @@
           template="{{selectedTemplate}}" 
           userInput="{{userInput}}" 
           freeGenerateOnce="{{freeGenerateOnce}}"
+          rerollBoostOnce="{{rerollBoostOnce}}"
           bind:finish="onGenerationFinish"
           bind:insufficient="onGenerateInsufficient"
           bind:error="onGenerationError"
