@@ -38,7 +38,7 @@
             <view bindtap="onHistorySelect" data-item="{{item}}" class="aspect-3-4 relative rounded-xl overflow-hidden border border-white-10 active-scale-95 transition-transform">
               <image src="{{item.imageUrl}}" class="w-full h-full object-cover" mode="aspectFill" />
               <view class="absolute inset-0 bg-gradient-t-black flex flex-col justify-end p-3">
-                <text class="text-sm font-bold text-white line-clamp-1">{{item.text}}</text>
+                <text class="text-sm font-bold text-white line-clamp-1">{{item.displayText}}</text>
                 <text class="text-xs-mini text-gray-400">{{item.dateStr}}</text>
                 <view class="absolute top-2 right-2 px-2 py-0-5 text-xs-mini font-black italic border rounded bg-black-50 text-white">{{item.rarity}}</view>
               </view>

@@ -1096,7 +1096,6 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
     isSharedView?: boolean
 }) => {
   const isSSR = result.rarity === 'SSR';
-  const [showToast, setShowToast] = useState(false);
 
   // Asset Value: Unique Serial Number logic (Mocked for now based on timestamp)
   const serialNumber = `NO.${result.timestamp.toString().slice(-4)}`;
@@ -1106,11 +1105,6 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
       // filter: isSSR ? 'brightness(1.2) contrast(1.1)' : 'sepia(0.2)' 
   };
 
-  const handleTouchStart = () => {
-      setTimeout(() => setShowToast(true), 500);
-      setTimeout(() => setShowToast(false), 2500);
-  };
-  
   const handleShareClick = async () => {
       // 1. Construct Share URL with parameters to ensure the recipient sees the exact same card
       const shareParams = new URLSearchParams();
@@ -1145,7 +1139,6 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
   return (
     <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col p-4 animate-in fade-in zoom-in duration-300 overflow-y-auto overflow-x-hidden">
       {isSSR && <Confetti />}
-      {showToast && <Toast message="已保存到相册 (模拟)" visible={true} />}
 
       {isSSR && (
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-yellow-500/20 via-transparent to-transparent animate-pulse"></div>
@@ -1188,7 +1181,7 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
         {/* Updated to HoloCard for interaction */}
         <HoloCard rarity={result.rarity} className={`bg-white p-3 pb-8 rounded shadow-2xl relative group w-[340px] max-w-[92vw] aspect-[9/16] flex-shrink-0 mx-auto select-none ${isSSR ? 'card-holo border-ssr' : ''}`}>
              {/* Content Wrapper to handle Touch Start for save */}
-             <div onTouchStart={handleTouchStart} className="h-full flex flex-col">
+             <div className="h-full flex flex-col">
                 <div className="absolute -top-4 -left-2 z-20 max-w-[80%] transform -rotate-2">
                     <div className="bg-yellow-300 text-black px-3 py-1.5 shadow-md border-2 border-black font-serif font-bold text-sm leading-tight break-words">
                         "{result.userInput}"

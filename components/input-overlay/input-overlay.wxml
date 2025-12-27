@@ -25,7 +25,7 @@
 
       <!-- Quick Prompts -->
       <block wx:if="{{!polishOptions && template.quickPrompts && template.quickPrompts.length > 0}}">
-          <view class="flex flex-wrap gap-2 mb-2">
+          <view class="flex flex-wrap gap-2 mt-4 mb-2">
               <block wx:for="{{template.quickPrompts}}" wx:key="*this">
                   <view
                       bindtap="onQuickPrompt"
@@ -40,7 +40,7 @@
 
       <!-- AI Options -->
       <block wx:if="{{polishOptions}}">
-          <view class="space-y-2 mb-2 animate-fade-in">
+          <view class="space-y-2 mt-4 mb-2 animate-fade-in">
               <view class="text-xs text-neon-green font-bold flex items-center gap-1">
                   <image src="https://api.iconify.design/lucide:sparkles.svg?color=%2300ff00" class="w-3 h-3" />
                   <text>DECODED SIGNALS (Select one):</text>

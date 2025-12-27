@@ -702,6 +702,8 @@ view, scroll-view, swiper, button, input, textarea, label, navigator, image {
 .aspect-square { aspect-ratio: 1 / 1; }
 .aspect-4-5 { aspect-ratio: 4 / 5; }
 .aspect-3-4 { aspect-ratio: 3 / 4; }
+.aspect-9-16 { aspect-ratio: 9 / 16; }
+.w-card { width: 640rpx; }
 
 .btn-neon-glow {
   box-shadow: 0 0 40rpx rgba(255, 0, 255, 0.25);
@@ -741,5 +743,12 @@ view, scroll-view, swiper, button, input, textarea, label, navigator, image {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+.line-clamp-2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }

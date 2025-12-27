@@ -11,6 +11,31 @@ Page({
     canClaimDaily: false
   },
 
+  normalizeHistory(items) {
+    const list = Array.isArray(items) ? items : [];
+    const out = [];
+    for (const it of list) {
+      if (!it || typeof it !== 'object') continue;
+      const item = { ...it };
+      const ts = item && item.timestamp ? item.timestamp : Date.now();
+      item.dateStr = new Date(ts).toLocaleDateString();
+
+      const text = String(item.text || '').trim();
+      const userInput = String(item.userInput || '').trim();
+      let displayText = '';
+      if (item.templateId === 'custom-signal') {
+        const content = String(item.content || '').trim();
+        displayText = content || text || userInput;
+      } else {
+        displayText = text || userInput;
+      }
+      if (displayText.length > 16) displayText = displayText.slice(0, 16);
+      item.displayText = displayText;
+      out.push(item);
+    }
+    return out;
+  },
+
   onLoad() {
     const app = getApp();
     if (app.globalData && app.globalData.totalHeaderHeight) {
@@ -46,23 +71,7 @@ Page({
         .then((res) => {
           const items = res?.data?.data?.items;
           if (res.statusCode === 200 && Array.isArray(items)) {
-            for (const item of items) {
-              const ts = item && item.timestamp ? item.timestamp : Date.now();
-              item.dateStr = new Date(ts).toLocaleDateString();
-
-              const text = String(item.text || '').trim();
-              const userInput = String(item.userInput || '').trim();
-              let displayText = '';
-              if (item.templateId === 'custom-signal') {
-                const content = String(item.content || '').trim();
-                displayText = content || text || userInput;
-              } else {
-                displayText = text || userInput;
-              }
-              if (displayText.length > 16) displayText = displayText.slice(0, 16);
-              item.text = displayText;
-            }
-            this.setData({ history: items });
+            this.setData({ history: this.normalizeHistory(items) });
           } else {
             wx.showToast({ title: '加载失败，请检查后端服务', icon: 'none' });
           }

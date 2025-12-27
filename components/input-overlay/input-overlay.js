@@ -1,4 +1,4 @@
-import { fetchAffectLabTemplates } from '../../utils/api';
+import { requestAffectLab, fetchAffectLabTemplates } from '../../utils/api';
 
 Component({
   options: {
@@ -56,15 +56,49 @@ Component({
       this.setData({ isPolishing: true, polishOptions: null, recommendedId: null, polishStyle: '' });
 
       const raw = this.data.input.trim();
-      const opts = [
-        { style: 'TOXIC', text: `${raw}？笑死，我先跑路` },
-        { style: 'EMO', text: `${raw}。夜色替我说完了` },
-        { style: 'GLITCH', text: `${raw} // SIGNAL_LOST_404` },
-        { style: 'ZEN', text: `${raw}。先把呼吸调成静音` },
-        { style: 'RAGE', text: `${raw}。我宣布：别惹我` }
-      ].map(o => ({ style: o.style, text: String(o.text || '').slice(0, 50) }));
+      try {
+        const resp = await requestAffectLab({
+          path: '/text/polish',
+          method: 'POST',
+          data: { inputText: raw },
+          auth: false,
+          timeoutMs: 15000
+        });
+        const payload = (resp && resp.data && resp.data.data) ? resp.data.data : (resp && resp.data ? resp.data : null);
+        const options = payload && Array.isArray(payload.options) ? payload.options : null;
+        const cleaned = [];
+        if (options) {
+          for (const it of options) {
+            const style = String(it && it.style ? it.style : '').trim().toUpperCase();
+            const text = String(it && it.text ? it.text : '').trim();
+            if (!style || !text) continue;
+            if (!['TOXIC', 'EMO', 'GLITCH'].includes(style)) continue;
+            cleaned.push({ style, text: text.slice(0, 50) });
+          }
+        }
 
-      this.setData({ polishOptions: opts, isPolishing: false });
+        const nextOpts = cleaned.length > 0 ? cleaned : null;
+        const recommendedId = payload && payload.recommendedTemplateId ? String(payload.recommendedTemplateId).trim() : '';
+        if (recommendedId) {
+          try {
+            const templates = await fetchAffectLabTemplates();
+            const t = (Array.isArray(templates) ? templates : []).find(x => x && x.id === recommendedId);
+            this.setData({
+              recommendedId,
+              recommendedTemplateName: t ? (t.title || '') : ''
+            });
+          } catch (e) {
+            this.setData({ recommendedId });
+          }
+        }
+        if (!nextOpts) {
+          wx.showToast({ title: '转译失败，无可用数据', icon: 'none' });
+        }
+        this.setData({ polishOptions: nextOpts, isPolishing: false });
+      } catch (e) {
+        wx.showToast({ title: '转译失败，请检查后端服务', icon: 'none' });
+        this.setData({ polishOptions: null, isPolishing: false });
+      }
     },
     onSelectOption(e) {
       this.setData({ 
