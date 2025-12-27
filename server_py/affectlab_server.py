@@ -1018,22 +1018,90 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
 
 
 @app.get("/affectlab/api/cards")
-def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(get_db)):
+def list_cards(
+    request: Request,
+    limit: int = 10,
+    offset: int = 0,
+    kw: str | None = None,
+    category: str | None = None,
+    rarity: str | None = None,
+    db=Depends(get_db),
+):
+    _ensure_business_schema(db)
     user_id = get_current_user_id(request)
     lim = max(1, min(limit, 200))
     off = max(0, offset)
+    kw2 = (kw or "").strip()
+    cat2 = (category or "").strip()
+    rar2 = (rarity or "").strip().upper()
+    if rar2 and rar2 not in ("N", "R", "SR", "SSR"):
+        raise HTTPException(status_code=400, detail="Invalid rarity")
+
+    where = ["r.user_id = :uid"]
+    params: dict = {"uid": user_id, "lim": lim, "off": off, "kw": "", "cat": "", "rar": ""}
+    if rar2:
+        where.append("r.rarity = :rar")
+        params["rar"] = rar2
+    if cat2:
+        where.append("t.category = :cat")
+        params["cat"] = cat2
+    if kw2:
+        params["kw"] = f"%{kw2}%"
+        where.append(
+            "("
+            "r.template_id LIKE :kw OR "
+            "t.title LIKE :kw OR "
+            "t.tag LIKE :kw OR "
+            "t.category LIKE :kw OR "
+            "r.user_input LIKE :kw OR "
+            "r.ai_text LIKE :kw OR "
+            "r.content LIKE :kw"
+            ")"
+        )
+
+    where_sql = " AND ".join(where)
+    total = int(
+        db.execute(
+            text(
+                f"""
+                SELECT COUNT(*)
+                FROM affectlab_emotion_card_record r
+                LEFT JOIN affectlab_emotion_template t ON r.template_id = t.template_id
+                WHERE {where_sql}
+                """
+            ),
+            params,
+        ).scalar()
+        or 0
+    )
     rows = (
         db.execute(
             text(
                 """
-                SELECT record_id, template_id, user_input, ai_text, content, rarity, luck_score, image_url, meta, created_at
-                FROM affectlab_emotion_card_record
-                WHERE user_id = :uid
-                ORDER BY created_at DESC, id DESC
+                SELECT
+                  r.record_id,
+                  r.template_id,
+                  r.user_input,
+                  r.ai_text,
+                  r.content,
+                  r.rarity,
+                  r.luck_score,
+                  r.image_url,
+                  r.meta,
+                  r.created_at,
+                  t.title AS template_title,
+                  t.category AS template_category,
+                  t.tag AS template_tag
+                FROM affectlab_emotion_card_record r
+                LEFT JOIN affectlab_emotion_template t ON r.template_id = t.template_id
+                WHERE """
+                + where_sql
+                + """
+                ORDER BY r.created_at DESC, r.id DESC
                 LIMIT :lim OFFSET :off
                 """
             ),
-            {"uid": user_id, "lim": lim, "off": off},
+            params,
         )
         .mappings()
         .all()
@@ -1054,6 +1122,9 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
                     {
                         "id": r["record_id"],
                         "templateId": r["template_id"],
+                        "templateTitle": r.get("template_title") or "",
+                        "templateCategory": r.get("template_category") or "",
+                        "templateTag": r.get("template_tag") or "",
                         "imageUrl": r.get("image_url") or "",
                         "text": r.get("ai_text") or "",
                         "content": r.get("content") or "",
@@ -1064,8 +1135,16 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
                 "luckScore": int(r.get("luck_score") or 0),
             }
         )
-    logger.info("DB read cards count=%s user_id=%s", len(items), int(user_id or 0))
-    return {"code": 200, "data": {"items": items}}
+    logger.info(
+        "DB read cards count=%s total=%s user_id=%s kw=%s category=%s rarity=%s",
+        len(items),
+        int(total or 0),
+        int(user_id or 0),
+        (kw2 or "")[:20],
+        cat2,
+        rar2,
+    )
+    return {"code": 200, "data": {"items": items, "total": int(total or 0)}}
 
 
 @app.get("/affectlab/api/event/temple_fair/status")

@@ -1,5 +1,16 @@
 import { requestAffectLab, getAffectLabToken, affectLabLogin } from '../../utils/api';
 
+const _defaultAvatarUrl = 'https://api.iconify.design/lucide:user.svg?color=%2300ff00';
+
+const _buildUserDisplayName = ({ nick, openid }) => {
+  const n = String(nick || '').trim();
+  if (n && !/^user_/i.test(n)) return `赛博用户：${n}`;
+  const oid = String(openid || '');
+  const suffix = oid ? oid.slice(-6) : '';
+  if (suffix) return `微信用户${suffix}`;
+  return '微信用户';
+};
+
 Page({
   data: {
     candyCount: 0,
@@ -8,7 +19,9 @@ Page({
     navBarHeight: 44,
     menuButtonWidth: 90,
     canClaimDaily: false,
-    summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 }
+    summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 },
+    userDisplayName: '微信用户',
+    userAvatarUrl: _defaultAvatarUrl
   },
 
   onLoad() {
@@ -21,6 +34,10 @@ Page({
         menuButtonWidth: app.globalData.menuButtonWidth
       });
     }
+    try {
+      const openid = wx.getStorageSync('affectlab_openid') || '';
+      this.setData({ userDisplayName: _buildUserDisplayName({ nick: '', openid }) });
+    } catch (e) {}
   },
 
   onShow() {
@@ -39,6 +56,17 @@ Page({
 
       requestAffectLab({ path: '/user/me', method: 'GET' })
         .then((res) => {
+          const user = res?.data?.data?.user || {};
+          const nick = user?.nick || '';
+          const avatar = user?.avatar || '';
+          let openid = '';
+          try {
+            openid = wx.getStorageSync('affectlab_openid') || '';
+          } catch (e) {}
+          const userDisplayName = _buildUserDisplayName({ nick, openid });
+          const userAvatarUrl = (typeof avatar === 'string' && avatar) ? avatar : _defaultAvatarUrl;
+          this.setData({ userDisplayName, userAvatarUrl });
+
           const b = res?.data?.data?.balance || {};
           const bal = b?.balance;
           const lastDailyDate = b?.last_daily_date;

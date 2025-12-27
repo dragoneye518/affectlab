@@ -159,6 +159,10 @@ export const affectLabLogin = (userInfo) => {
                     });
                     if (res.statusCode === 200 && res.data && res.data.data && res.data.data.token) {
                         setAffectLabToken(res.data.data.token);
+                        try {
+                            const openid = res.data.data.openid;
+                            if (typeof openid === 'string' && openid) wx.setStorageSync('affectlab_openid', openid);
+                        } catch (e) {}
                         resolve(res.data.data);
                         return;
                     }

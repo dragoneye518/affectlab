@@ -18,23 +18,69 @@
 
   <view class="px-4 max-w-md mx-auto relative z-10" style="padding-top: {{contentPaddingTop}}px;">
     <view class="animate-fade-in">
+      <view class="relative mb-4">
+        <input
+          type="text"
+          placeholder="搜：标签 / 卡名 / 类目"
+          class="w-full bg-dark-800 border border-white-20 rounded-xl py-4 pr-4 text-white font-mono h-12"
+          style="padding-left: 3.5rem;"
+          value="{{kw}}"
+          bindinput="onKwInput"
+          bindconfirm="onSearchConfirm"
+          confirm-type="search"
+        />
+        <image src="https://api.iconify.design/lucide:search.svg?color=gray" class="absolute left-4 top-1-2 -translate-y-1-2 w-5 h-5" />
+        <view wx:if="{{kw}}" bindtap="onClearKw" class="absolute right-4 top-1-2 -translate-y-1-2 text-gray-400 text-xs font-bold px-2 py-1 rounded-lg border border-white-10 bg-black-50">
+          清空
+        </view>
+      </view>
+
+      <view class="mb-5 space-y-3">
+        <scroll-view scroll-x show-scrollbar="false" class="w-full">
+          <view class="flex gap-2">
+            <block wx:for="{{categories}}" wx:key="key">
+              <view
+                bindtap="onSelectCategory"
+                data-key="{{item.key}}"
+                class="px-2 py-1 rounded-full border text-xs font-bold active-scale-95 transition-all {{selectedCategory === item.key ? 'bg-neon-green text-black border-neon-green' : 'bg-white-5 text-gray-300 border-white-10'}}"
+              >
+                {{item.label}}
+              </view>
+            </block>
+          </view>
+        </scroll-view>
+        <scroll-view scroll-x show-scrollbar="false" class="w-full">
+          <view class="flex gap-2">
+            <block wx:for="{{rarities}}" wx:key="key">
+              <view
+                bindtap="onSelectRarity"
+                data-key="{{item.key}}"
+                class="px-2 py-1 rounded-full border text-xs font-bold active-scale-95 transition-all {{selectedRarity === item.key ? 'bg-neon-pink text-white border-neon-pink' : 'bg-white-5 text-gray-300 border-white-10'}}"
+              >
+                {{item.label}}
+              </view>
+            </block>
+          </view>
+        </scroll-view>
+      </view>
+
       <view class="flex items-center justify-between mb-6">
         <view class="flex items-center gap-2">
           <text class="text-xs text-gray-500 tracking-widest uppercase font-bold">生成记录</text>
         </view>
-        <text class="text-sm font-normal text-gray-500">{{history.length}}</text>
+        <text class="text-sm font-normal text-gray-500">{{items.length}}/{{total}}</text>
       </view>
 
-      <block wx:if="{{history.length === 0}}">
+      <block wx:if="{{items.length === 0}}">
         <view class="text-center py-20 opacity-50 space-y-4 flex flex-col items-center">
           <image src="https://api.iconify.design/lucide:backpack.svg?color=gray" class="w-12 h-12 opacity-20" />
-          <text>Empty Inventory</text>
+          <text>{{loading ? '加载中...' : '暂无记录'}}</text>
         </view>
       </block>
 
       <block wx:else>
         <view class="grid grid-cols-2 gap-4">
-          <block wx:for="{{history}}" wx:key="id">
+          <block wx:for="{{items}}" wx:key="id">
             <view bindtap="onHistorySelect" data-item="{{item}}" class="aspect-3-4 relative rounded-xl overflow-hidden border border-white-10 active-scale-95 transition-transform">
               <image src="{{item.imageUrl}}" class="w-full h-full object-cover" mode="aspectFill" />
               <view class="absolute inset-0 bg-gradient-t-black flex flex-col justify-end p-3">
@@ -44,6 +90,13 @@
               </view>
             </view>
           </block>
+        </view>
+
+        <view wx:if="{{loading}}" class="text-center py-6 opacity-60 text-xs text-gray-500">
+          加载中...
+        </view>
+        <view wx:elif="{{!hasMore && items.length > 0}}" class="text-center py-6 opacity-60 text-xs text-gray-600">
+          没有更多了
         </view>
       </block>
     </view>
