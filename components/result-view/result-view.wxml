@@ -1,4 +1,4 @@
-<view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 animate-zoom-in overflow-y-auto overflow-x-hidden" style="z-index: 300;">
+<view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 animate-zoom-in overflow-y-auto overflow-x-hidden">
   <!-- Confetti Canvas -->
   <block wx:if="{{result.rarity === 'SSR'}}">
       <confetti />
