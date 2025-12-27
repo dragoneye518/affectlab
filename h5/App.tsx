@@ -1186,16 +1186,16 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
         </div>
 
         {/* Updated to HoloCard for interaction */}
-        <HoloCard rarity={result.rarity} className={`bg-white p-3 pb-8 rounded shadow-2xl relative group max-w-sm w-full mx-auto select-none ${isSSR ? 'card-holo border-ssr' : ''}`}>
+        <HoloCard rarity={result.rarity} className={`bg-white p-3 pb-8 rounded shadow-2xl relative group w-[340px] max-w-[92vw] aspect-[9/16] flex-shrink-0 mx-auto select-none ${isSSR ? 'card-holo border-ssr' : ''}`}>
              {/* Content Wrapper to handle Touch Start for save */}
-             <div onTouchStart={handleTouchStart}>
+             <div onTouchStart={handleTouchStart} className="h-full flex flex-col">
                 <div className="absolute -top-4 -left-2 z-20 max-w-[80%] transform -rotate-2">
                     <div className="bg-yellow-300 text-black px-3 py-1.5 shadow-md border-2 border-black font-serif font-bold text-sm leading-tight break-words">
                         "{result.userInput}"
                     </div>
                 </div>
 
-                <div className="aspect-[3/4] bg-gray-100 overflow-hidden mb-4 relative border-2 border-black">
+                <div className="flex-1 bg-gray-100 overflow-hidden mb-4 relative border-2 border-black">
                     <img 
                         src={result.imageUrl} 
                         className="w-full h-full object-cover pointer-events-auto cyber-image-container filter-cyber-glitch" 
@@ -1217,7 +1217,10 @@ const ResultView = ({ result, onClose, onShare, onReroll, isSharedView = false }
                 </div>
                 
                 <div className="px-2">
-                    <h2 className="font-serif text-2xl font-bold text-black leading-tight mb-4 tracking-tight">
+                    <h2
+                        className="font-serif text-2xl font-bold text-black leading-tight mb-4 tracking-tight overflow-hidden"
+                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+                    >
                         "{result.text}"
                     </h2>
                     <div className="flex justify-between items-end border-t-2 border-black pt-2">
