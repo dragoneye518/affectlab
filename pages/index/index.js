@@ -440,6 +440,7 @@ Page({
   },
 
   onOpenRadar() {
+    this.hideTabBarSafe();
     this.setData({ 
       showCategory: true,
       _tempCategoryFilter: this.data.categoryFilter,
@@ -449,6 +450,7 @@ Page({
   
   closeRadar() {
     this.setData({ showCategory: false });
+    this.showTabBarSafe();
   },
 
   onRadarCancel() {
@@ -458,10 +460,12 @@ Page({
       showCategory: false
     });
     this.updateTemplates();
+    this.showTabBarSafe();
   },
 
   onRadarConfirm() {
     this.setData({ showCategory: false });
+    this.showTabBarSafe();
   },
   
   onSelectCategory(e) {
@@ -471,13 +475,21 @@ Page({
   
   onTagSearch(e) {
     const tag = e.currentTarget.dataset.tag.replace('#', '');
-    this.setData({ searchTerm: tag, categoryFilter: null });
+    if (this.data.searchTerm === tag) {
+      this.setData({ searchTerm: '', categoryFilter: null });
+    } else {
+      this.setData({ searchTerm: tag, categoryFilter: null });
+    }
     this.updateTemplates();
   },
   
   onTagFilter(e) {
     const tag = e.currentTarget.dataset.tag;
-    this.setData({ searchTerm: tag, categoryFilter: null });
+    if (this.data.searchTerm === tag) {
+      this.setData({ searchTerm: '', categoryFilter: null });
+    } else {
+      this.setData({ searchTerm: tag, categoryFilter: null });
+    }
     this.updateTemplates();
   },
   
@@ -498,6 +510,7 @@ Page({
   onSearchConfirm() {
     this.setData({ showCategory: false });
     this.updateTemplates();
+    this.showTabBarSafe();
   },
 
   startBannerTimer() {
