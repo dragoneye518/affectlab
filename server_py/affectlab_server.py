@@ -174,6 +174,83 @@ def _modelscope_chat(messages: list[dict], model: str) -> str | None:
     return (data.get("choices") or [{}])[0].get("message", {}).get("content")
 
 
+def _deepseek_chat(messages: list[dict], model: str = "deepseek-chat") -> str | None:
+    api_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
+    if not api_key:
+        logger.info("REMOTE ai deepseek skipped: missing DEEPSEEK_API_KEY")
+        return None
+    started_at = time.time()
+    try:
+        r = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "model": model,
+                    "messages": messages,
+                    "stream": False,
+                },
+                ensure_ascii=False,
+            ).encode("utf-8"),
+            timeout=30,
+        )
+        logger.info("REMOTE ai deepseek chat status=%s ms=%s model=%s", r.status_code, int((time.time() - started_at) * 1000), model)
+        r.raise_for_status()
+        data = r.json()
+        return (data.get("choices") or [{}])[0].get("message", {}).get("content")
+    except Exception as e:
+        logger.error("REMOTE ai deepseek chat error ms=%s err=%s", int((time.time() - started_at) * 1000), str(e))
+        return None
+
+
+def _extract_json_object(s: str) -> str | None:
+    if not s:
+        return None
+    a = s.find("{")
+    b = s.rfind("}")
+    if a < 0 or b < 0 or b <= a:
+        return None
+    return s[a : b + 1]
+
+
+def _sanitize_polish_payload(payload: dict, input_text: str) -> dict:
+    opts = payload.get("options")
+    if not isinstance(opts, list):
+        opts = []
+    cleaned = []
+    for it in opts:
+        if not isinstance(it, dict):
+            continue
+        style = str(it.get("style") or "").strip().upper()
+        txt = _shorten_text(str(it.get("text") or "").strip(), max_len=40)
+        if not style or not txt:
+            continue
+        if style not in ("TOXIC", "EMO", "GLITCH"):
+            continue
+        cleaned.append({"style": style, "text": txt})
+    uniq = {}
+    for it in cleaned:
+        uniq[it["style"]] = it
+    fixed = [uniq.get("TOXIC"), uniq.get("EMO"), uniq.get("GLITCH")]
+    fixed = [x for x in fixed if x]
+
+    if len(fixed) < 3:
+        base = _shorten_text(input_text, max_len=34)
+        fallback = [
+            {"style": "TOXIC", "text": _shorten_text(f"{base}？笑死，我先跑路", max_len=40)},
+            {"style": "EMO", "text": _shorten_text(f"{base}。夜色替我说完了", max_len=40)},
+            {"style": "GLITCH", "text": _shorten_text(f"{base} // SIGNAL_LOST_404", max_len=40)},
+        ]
+        for it in fallback:
+            if it["style"] not in uniq:
+                fixed.append(it)
+        fixed = fixed[:3]
+
+    rid = payload.get("recommendedTemplateId")
+    if rid is not None:
+        rid = str(rid).strip() or None
+    return {"options": fixed, "recommendedTemplateId": rid}
+
 def _shorten_text(s: str, max_len: int = 40) -> str:
     s2 = (s or "").strip()
     if len(s2) <= max_len:
@@ -375,44 +452,49 @@ def text_polish(req: TextPolishRequest, request: Request, db=Depends(get_db)):
     if not prompt:
         raise HTTPException(status_code=400, detail="Empty inputText")
 
+    prompt2 = _shorten_text(prompt, max_len=120)
     messages = [
         {
             "role": "system",
-            "content": "你是赛博情绪实验室的嘴替引擎。把用户输入改写成三种风格短句（中文优先，每条<=40字）：TOXIC/EMO/GLITCH。输出严格JSON：{options:[{style,text}...],recommendedTemplateId:null或字符串}。不要输出多余字段。",
+            "content": (
+                "你是赛博情绪实验室的「信号转译」引擎。任务：把用户的原始情绪/事件输入，转译成三条中文短句文案，用于情绪卡片。"
+                "必须严格输出 JSON 对象：{\"options\":[{\"style\":\"TOXIC|EMO|GLITCH\",\"text\":\"...\"},...],\"recommendedTemplateId\":null或字符串}。"
+                "要求：每条 text 8~40 字；保留用户核心信息但更像“互联网嘴替”；不要解释、不要多余字段、不要 Markdown。"
+                "风格：TOXIC=犀利吐槽但不辱骂；EMO=氛围感/诗意/孤独；GLITCH=系统故障/机械抽象。"
+            ),
         },
-        {"role": "user", "content": prompt},
+        {"role": "user", "content": prompt2},
     ]
 
     content = None
     try:
-        content = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
+        content = _deepseek_chat(messages, model=os.getenv("AFFECTLAB_POLISH_MODEL", "deepseek-chat"))
     except Exception:
         content = None
+    if not content:
+        try:
+            content = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
+        except Exception:
+            content = None
 
     if not content:
-        s = _shorten_text(prompt, max_len=34)
-        return {
-            "options": [
-                {"style": "TOXIC", "text": _shorten_text(f"{s}？笑死，我先跑路", max_len=40)},
-                {"style": "EMO", "text": _shorten_text(f"{s}。夜色替我说完了", max_len=40)},
-                {"style": "GLITCH", "text": _shorten_text(f"{s} // SIGNAL_LOST_404", max_len=40)},
-            ],
-            "recommendedTemplateId": None,
-        }
+        return _sanitize_polish_payload({}, prompt2)
 
     try:
         parsed = json.loads(content)
-        return parsed
+        if isinstance(parsed, dict):
+            return _sanitize_polish_payload(parsed, prompt2)
+        return _sanitize_polish_payload({}, prompt2)
     except Exception:
-        base = _shorten_text(prompt, max_len=34)
-        return {
-            "options": [
-                {"style": "TOXIC", "text": _shorten_text(f"{base}，但我不装了", max_len=40)},
-                {"style": "EMO", "text": _shorten_text(f"{base}。把叹气交给风", max_len=40)},
-                {"style": "GLITCH", "text": _shorten_text(f"{base} :: ERR_EMO_0x01", max_len=40)},
-            ],
-            "recommendedTemplateId": None,
-        }
+        js = _extract_json_object(content)
+        if js:
+            try:
+                parsed2 = json.loads(js)
+                if isinstance(parsed2, dict):
+                    return _sanitize_polish_payload(parsed2, prompt2)
+            except Exception:
+                pass
+        return _sanitize_polish_payload({}, prompt2)
 
 
 @app.get("/affectlab/api/templates")
@@ -485,102 +567,125 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     if not tpl:
         raise HTTPException(status_code=404, detail="Template Not Found")
 
-    cost = int(tpl.get("cost") or 1)
-    record_id = f"al_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
-    cost_points = 0 if req.free else cost
-    balance_after = None
-    if req.free:
-        db.execute(
-            text("INSERT IGNORE INTO affectlab_user_balance(user_id, balance) VALUES (:uid, 0)"),
-            {"uid": user_id},
-        )
-        bal = db.execute(text("SELECT balance FROM affectlab_user_balance WHERE user_id = :uid"), {"uid": user_id}).scalar()
-        balance_after = int(bal or 0)
-        _insert_user_transaction(
-            db,
-            user_id=user_id,
-            amount=0,
-            tx_type="REROLL",
-            reason="AD",
-            project_id=record_id,
-            balance_after=balance_after,
-        )
-        db.commit()
-    else:
-        balance_after = deduct_points_internal(db, user_id, cost, reason="GENERATE", project_id=record_id)
-
     user_input = (req.userInput or "").strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Empty userInput")
 
-    rarity, luck_score = _pick_rarity()
-    if req.free and rarity in ("N", "R"):
-        rarity, luck_score = _pick_reroll_rarity()
-    assets = tpl.get("assets")
-    if isinstance(assets, str):
-        try:
-            assets = json.loads(assets)
-        except Exception:
-            assets = {}
-    if not isinstance(assets, dict):
-        assets = {}
-    image_url = assets.get(rarity) or assets.get("SR") or assets.get("R") or assets.get("N") or ""
+    cost = int(tpl.get("cost") or 1)
+    record_id = f"al_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+    cost_points = 0 if req.free else cost
+    balance_after = None
+    rarity = "N"
+    luck_score = 0
+    image_url = ""
+    ai_text = ""
+    filter_seed = 0
+    try:
+        if req.free:
+            db.execute(
+                text("INSERT IGNORE INTO affectlab_user_balance(user_id, balance) VALUES (:uid, 0)"),
+                {"uid": user_id},
+            )
+            bal = db.execute(text("SELECT balance FROM affectlab_user_balance WHERE user_id = :uid"), {"uid": user_id}).scalar()
+            balance_after = int(bal or 0)
+            _insert_user_transaction(
+                db,
+                user_id=user_id,
+                amount=0,
+                tx_type="REROLL",
+                reason="AD",
+                project_id=record_id,
+                balance_after=balance_after,
+            )
+        else:
+            balance_after = deduct_points_internal(db, user_id, cost, reason="GENERATE", project_id=record_id, commit=False)
 
-    ai_text = None
-    if req.templateId == "custom-signal":
-        ai_text = user_input
-    else:
-        preset_texts = tpl.get("preset_texts")
-        if isinstance(preset_texts, str):
+        rarity, luck_score = _pick_rarity()
+        if req.free and rarity in ("N", "R"):
+            rarity, luck_score = _pick_reroll_rarity()
+        assets = tpl.get("assets")
+        if isinstance(assets, str):
             try:
-                preset_texts = json.loads(preset_texts)
+                assets = json.loads(assets)
             except Exception:
-                preset_texts = []
-        if isinstance(preset_texts, list) and preset_texts:
-            ai_text = str(random.choice(preset_texts))
+                assets = {}
+        if not isinstance(assets, dict):
+            assets = {}
+        image_url = assets.get(rarity) or assets.get("SR") or assets.get("R") or assets.get("N") or ""
+
+        ai_text = None
+        if req.templateId == "custom-signal":
+            ai_text = user_input
+        else:
+            preset_texts = tpl.get("preset_texts")
+            if isinstance(preset_texts, str):
+                try:
+                    preset_texts = json.loads(preset_texts)
+                except Exception:
+                    preset_texts = []
+            if isinstance(preset_texts, list) and preset_texts:
+                ai_text = str(random.choice(preset_texts))
+
+            if not ai_text:
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "你是赛博情绪实验室的文案引擎。根据模板主题和用户输入生成一句中文短句（<=40字），风格偏互联网嘴替，直接输出短句，不要解释。",
+                    },
+                    {"role": "user", "content": f"模板：{tpl.get('title')}\n用户输入：{user_input}"},
+                ]
+                try:
+                    ai_text = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
+                except Exception:
+                    ai_text = None
 
         if not ai_text:
-            messages = [
-                {
-                    "role": "system",
-                    "content": "你是赛博情绪实验室的文案引擎。根据模板主题和用户输入生成一句中文短句（<=40字），风格偏互联网嘴替，直接输出短句，不要解释。",
-                },
-                {"role": "user", "content": f"模板：{tpl.get('title')}\n用户输入：{user_input}"},
-            ]
-            try:
-                ai_text = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
-            except Exception:
-                ai_text = None
+            logger.info(
+                "AI fallback to userInput record_id=%s template_id=%s user_id=%s",
+                record_id,
+                req.templateId,
+                int(user_id or 0),
+            )
 
-    if not ai_text:
-        logger.info("AI fallback to userInput record_id=%s template_id=%s user_id=%s", record_id, req.templateId, int(user_id or 0))
+        ai_text = _shorten_text(ai_text or user_input)
+        filter_seed = random.randint(0, 359)
 
-    ai_text = _shorten_text(ai_text or user_input)
-    filter_seed = random.randint(0, 359)
-
-    db.execute(
-        text(
-            """
-            INSERT INTO affectlab_emotion_card_record
-            (record_id, user_id, template_id, user_input, ai_text, rarity, luck_score, image_url, cost_points, meta)
-            VALUES
-            (:rid, :uid, :tid, :uin, :txt, :rar, :score, :img, :cost, :meta)
-            """
-        ),
-        {
-            "rid": record_id,
-            "uid": user_id,
-            "tid": req.templateId,
-            "uin": user_input,
-            "txt": ai_text,
-            "rar": rarity,
-            "score": int(luck_score),
-            "img": image_url,
-            "cost": cost_points,
-            "meta": json.dumps({"filterSeed": filter_seed}, ensure_ascii=False),
-        },
-    )
-    db.commit()
+        db.execute(
+            text(
+                """
+                INSERT INTO affectlab_emotion_card_record
+                (record_id, user_id, template_id, user_input, ai_text, rarity, luck_score, image_url, cost_points, meta)
+                VALUES
+                (:rid, :uid, :tid, :uin, :txt, :rar, :score, :img, :cost, :meta)
+                """
+            ),
+            {
+                "rid": record_id,
+                "uid": user_id,
+                "tid": req.templateId,
+                "uin": user_input,
+                "txt": ai_text,
+                "rar": rarity,
+                "score": int(luck_score),
+                "img": image_url,
+                "cost": cost_points,
+                "meta": json.dumps({"filterSeed": filter_seed}, ensure_ascii=False),
+            },
+        )
+        db.commit()
+    except HTTPException:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.error("Generate failed record_id=%s err=%s", record_id, str(e))
+        raise HTTPException(status_code=500, detail="Generate Failed")
     logger.info(
         "DB write card_record record_id=%s user_id=%s template_id=%s rarity=%s cost_points=%s",
         record_id,

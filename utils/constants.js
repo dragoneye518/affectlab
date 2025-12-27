@@ -12,7 +12,7 @@ const THEMES = {
 // --- ASSET MATRIX (Source of Truth) ---
 const TEMPLATE_ASSETS = {
     'custom-signal': {
-        N: 'https://longyan-sh.oss-cn-shanghai.aliyuncs.com/pixel/template/custom-N.png',
+        N: 'https://longyan-sh.oss-cn-shanghai.aliyuncs.com/pixel/template/%E8%87%B4%E6%9C%AA%E6%9D%A5-N.png',
         R: 'https://longyan-sh.oss-cn-shanghai.aliyuncs.com/pixel/template/%E8%87%B4%E6%9C%AA%E6%9D%A5-R.png',
         SR: 'https://longyan-sh.oss-cn-shanghai.aliyuncs.com/pixel/template/%E8%87%B4%E6%9C%AA%E6%9D%A5-SR.png',
         SSR: 'https://longyan-sh.oss-cn-shanghai.aliyuncs.com/pixel/template/%E8%87%B4%E6%9C%AA%E6%9D%A5-SSR.png'
@@ -437,7 +437,7 @@ const TEMPLATES = [
     cost: 1,
     category: 'future',
     inputHint: '输入任意内容',
-    quickPrompts: [],
+    quickPrompts: ['焦虑', '委屈', '暴躁', '心动', '摆烂', '内耗', '社恐', '空虚'],
     description: '通用信号转译模块。',
     keywords: ['通用', '转译', '信号'],
     presetTexts: []

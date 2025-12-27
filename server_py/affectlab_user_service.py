@@ -23,8 +23,6 @@ logging.basicConfig(
 logger = logging.getLogger("AffectLabUserService")
 
 def _load_env_file_if_needed() -> None:
-    if os.environ.get("DATABASE_URL") or os.environ.get("MYSQL_HOST"):
-        return
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         env_path = os.path.join(base_dir, ".env")
@@ -415,7 +413,14 @@ def recharge_points_internal(db, user_id: int, amount: int, reason: str, project
     return next_balance
 
 
-def deduct_points_internal(db, user_id: int, amount: int, reason: str, project_id: str | None = None) -> int:
+def deduct_points_internal(
+    db,
+    user_id: int,
+    amount: int,
+    reason: str,
+    project_id: str | None = None,
+    commit: bool = True,
+) -> int:
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
     rec = _get_balance_for_update(db, user_id)
@@ -450,7 +455,8 @@ def deduct_points_internal(db, user_id: int, amount: int, reason: str, project_i
         project_id=project_id,
         balance_after=next_balance,
     )
-    db.commit()
+    if commit:
+        db.commit()
     logger.info(
         "DB write balance deduct user_id=%s amount=%s reason=%s balance_after=%s project_id=%s",
         int(user_id or 0),
