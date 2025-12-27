@@ -12,7 +12,7 @@
   <view class="px-4 max-w-md mx-auto relative z-10" style="padding-top: {{contentPaddingTop}}px;">
       <view class="animate-fade-in">
               <!-- Countdown Banner -->
-              <view class="mx-4 mb-4 p-1 rounded-xl bg-gradient-banner active-scale-95 transition-transform hover-shadow-red relative overflow-hidden group">
+              <view bindtap="onOpenTempleFair" class="mx-4 mb-4 p-1 rounded-xl bg-gradient-banner active-scale-95 transition-transform hover-shadow-red relative overflow-hidden group">
                   <view class="bg-black-90 backdrop-blur rounded-lg p-4 flex items-center justify-between relative z-10">
                       <view class="z-10">
                           <view class="flex items-center gap-2 mb-1">
@@ -269,6 +269,8 @@
           userInput="{{userInput}}" 
           freeGenerateOnce="{{freeGenerateOnce}}"
           rerollBoostOnce="{{rerollBoostOnce}}"
+          apiPath="{{generatingApiPath}}"
+          apiData="{{generatingApiData}}"
           bind:finish="onGenerationFinish"
           bind:insufficient="onGenerateInsufficient"
           bind:error="onGenerationError"
@@ -299,6 +301,303 @@
   <!-- Share Overlay -->
   <block wx:if="{{showShare}}">
       <share-overlay bind:close="closeShareOverlay" />
+  </block>
+
+  <block wx:if="{{view === 'TEMPLE'}}">
+      <view class="fixed inset-0 z-80 bg-black-95 backdrop-blur flex flex-col p-4 overflow-y-auto overflow-x-hidden safe-bottom">
+          <view class="flex items-center justify-between mb-4" style="padding-top: {{statusBarHeight}}px;">
+              <view bindtap="onCloseTempleFair" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                  <image src="https://api.iconify.design/lucide:chevron-left.svg?color=white" class="w-5 h-5" />
+              </view>
+              <view class="flex flex-col items-center">
+                  <text class="text-sm font-black italic tracking-widest text-white">赛博庙会</text>
+                  <text class="text-xs-mini text-gray-400">CYBER TEMPLE FAIR</text>
+              </view>
+              <view class="w-9"></view>
+          </view>
+
+          <view class="mx-1 mb-4 p-1 rounded-xl bg-gradient-banner relative overflow-hidden">
+              <view class="bg-black-90 backdrop-blur rounded-lg p-4 flex items-center justify-between relative z-10">
+                  <view>
+                      <view class="flex items-center gap-2 mb-2">
+                          <view class="px-2 py-1 rounded-full bg-red-500-20 border border-red-500 text-red-400 text-xs-mini font-mono">情绪上链</view>
+                          <view class="px-2 py-1 rounded-full bg-neon-yellow-20 border border-neon-yellow-30 text-neon-yellow text-xs-mini font-mono">年味加载</view>
+                          <image src="https://api.iconify.design/lucide:party-popper.svg?color=%23fde047" class="w-4 h-4 animate-bounce" />
+                      </view>
+                      <view class="text-white font-black italic text-lg leading-tight">2026 赛博庙会</view>
+                      <view class="text-gray-400 text-xs">今日：{{templeFairToday}}</view>
+                  </view>
+                  <view class="text-right">
+                      <view class="font-mono text-xl font-bold text-white tracking-wider flex items-center gap-1 justify-end">
+                          <image src="https://api.iconify.design/lucide:timer.svg?color=%23ef4444" class="w-4 h-4" />
+                          <text>{{timeLeft.d}}<text class="text-xs text-gray-500 mx-0-5">d</text>{{timeLeft.h}}<text class="text-xs text-gray-500 mx-0-5">:</text>{{timeLeft.m}}</text>
+                      </view>
+                  </view>
+              </view>
+              <view class="absolute top-0 -inset-full h-full w-1-2 z-5 block transform -skew-x-12 bg-gradient-shine opacity-20 shine-on-active"></view>
+          </view>
+
+          <view class="px-1">
+              <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-3">三件套日课</view>
+
+              <view class="space-y-3">
+                  <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+                      <view class="flex items-center justify-between">
+                          <view class="flex flex-col">
+                              <text class="text-white font-bold">今日一签</text>
+                              <text class="text-xs-mini text-gray-400">免费 1 次 · 签文写入情绪内存</text>
+                          </view>
+                          <view class="flex items-center gap-2">
+                              <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.sign && templeFairTodayEntry.sign.recordId}}">
+                                  <view class="px-2 py-1 rounded-full bg-neon-green-20 border border-neon-green-30 text-neon-green text-xs-mini font-mono">已完成</view>
+                              </block>
+                              <button bindtap="onTempleDailyDraw" class="btn-neon-glow bg-gradient-green text-white px-4 py-2 rounded-xl text-sm font-bold active-scale-95">
+                                  {{(templeFairTodayEntry && templeFairTodayEntry.sign && templeFairTodayEntry.sign.recordId) ? '查看' : '抽签'}}
+                              </button>
+                          </view>
+                      </view>
+                      <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.sign && templeFairTodayEntry.sign.text}}">
+                          <view class="mt-3 bg-black-50 border border-white-10 rounded-xl px-3 py-2">
+                              <text class="text-white text-sm font-bold leading-tight break-words">“{{templeFairTodayEntry.sign.text}}”</text>
+                          </view>
+                      </block>
+                  </view>
+
+                  <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+                      <view class="flex items-center justify-between">
+                          <view class="flex flex-col">
+                              <text class="text-white font-bold">挂一盏灯</text>
+                              <text class="text-xs-mini text-gray-400">把今日签文挂进灯廊</text>
+                          </view>
+                          <view class="flex items-center gap-2">
+                              <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.lantern && templeFairTodayEntry.lantern.recordId}}">
+                                  <view class="px-2 py-1 rounded-full bg-neon-green-20 border border-neon-green-30 text-neon-green text-xs-mini font-mono">已完成</view>
+                              </block>
+                              <button bindtap="onOpenLanternEditor" class="btn-neon-glow bg-gradient-pink-purple text-white px-4 py-2 rounded-xl text-sm font-bold active-scale-95">
+                                  {{(templeFairTodayEntry && templeFairTodayEntry.lantern && templeFairTodayEntry.lantern.recordId) ? '修改' : '挂灯'}}
+                              </button>
+                          </view>
+                      </view>
+                      <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.lantern && templeFairTodayEntry.lantern.title}}">
+                          <view class="mt-3 flex items-center justify-between bg-black-50 border border-white-10 rounded-xl px-3 py-2">
+                              <text class="text-white text-sm font-bold break-words">{{templeFairTodayEntry.lantern.title}}</text>
+                              <view class="text-xs-mini font-mono {{templeFairTodayEntry.lantern.isPublic ? 'text-neon-blue' : 'text-gray-400'}}">
+                                  {{templeFairTodayEntry.lantern.isPublic ? '公开' : '私密'}}
+                              </view>
+                          </view>
+                      </block>
+                  </view>
+
+                  <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+                      <view class="flex items-center justify-between">
+                          <view class="flex flex-col">
+                              <text class="text-white font-bold">盖一个章</text>
+                              <text class="text-xs-mini text-gray-400">选一个摊位生成，解锁今日章</text>
+                          </view>
+                          <view class="flex items-center gap-2">
+                              <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.stamp && templeFairTodayEntry.stamp.recordId}}">
+                                  <view class="px-2 py-1 rounded-full bg-neon-green-20 border border-neon-green-30 text-neon-green text-xs-mini font-mono">已完成</view>
+                              </block>
+                              <button bindtap="onOpenStampBooths" class="btn-neon-glow bg-gradient-yellow border border-yellow-500-50 text-white px-4 py-2 rounded-xl text-sm font-bold active-scale-95">
+                                  {{(templeFairTodayEntry && templeFairTodayEntry.stamp && templeFairTodayEntry.stamp.recordId) ? '再盖' : '去盖章'}}
+                              </button>
+                          </view>
+                      </view>
+                      <block wx:if="{{templeFairTodayEntry && templeFairTodayEntry.stamp && templeFairTodayEntry.stamp.boothLabel}}">
+                          <view class="mt-3 flex items-center justify-between bg-black-50 border border-white-10 rounded-xl px-3 py-2">
+                              <text class="text-white text-sm font-bold">{{templeFairTodayEntry.stamp.boothLabel}}</text>
+                              <view class="text-xs-mini font-mono text-gray-400">{{templeFairTodayEntry.stamp.rarity || ''}}</view>
+                          </view>
+                      </block>
+                  </view>
+              </view>
+          </view>
+
+          <view class="px-1 mt-4">
+              <view class="rounded-2xl border border-white-10 bg-dark-800 p-4">
+                  <view class="flex items-center justify-between">
+                      <view class="flex flex-col">
+                          <text class="text-white font-bold">庙会看板</text>
+                          <text class="text-xs-mini text-gray-400">入口：公共灯廊 / 游记回放</text>
+                      </view>
+                  </view>
+                  <view class="mt-2 flex items-center justify-between">
+                      <view class="text-xs-mini text-gray-500 font-mono">
+                          <block wx:if="{{templeFairStatsLoading}}">
+                              SYNC...
+                          </block>
+                          <block wx:elif="{{templeFairStats}}">
+                              今日签 {{templeFairStats.todaySigns}} · 今日章 {{templeFairStats.todayStamps}} · 公共灯 {{templeFairStats.publicLanterns}}
+                          </block>
+                          <block wx:else>
+                              暂无统计
+                          </block>
+                      </view>
+                      <view bindtap="loadTempleFairStats" class="text-xs-mini text-gray-400 underline active-scale-95">刷新</view>
+                  </view>
+                  <view class="mt-3 grid grid-cols-2 gap-3">
+                      <button bindtap="onOpenTempleFairPublic" class="btn-neon-glow bg-black-50 border border-white-10 text-gray-200 py-3 rounded-xl text-sm font-bold active-scale-95">
+                          逛灯廊
+                      </button>
+                      <button bindtap="onOpenTempleFairMemory" class="btn-neon-glow bg-black-50 border border-white-10 text-gray-200 py-3 rounded-xl text-sm font-bold active-scale-95">
+                          看游记
+                      </button>
+                  </view>
+              </view>
+          </view>
+
+          <block wx:if="{{showTempleFairPublicModal}}">
+              <view class="fixed inset-0 z-90 bg-black-95 backdrop-blur flex flex-col p-4 animate-fade-in safe-bottom" catchtouchmove="preventTouchMove">
+                  <view class="flex justify-between items-center mb-4" style="padding-top: {{statusBarHeight}}px;">
+                      <view class="flex flex-col">
+                          <text class="text-sm font-bold text-white">公共灯廊</text>
+                          <text class="text-xs-mini text-gray-500">仅展示灯牌标题 · 点击回看</text>
+                      </view>
+                      <view class="flex items-center gap-2">
+                          <button bindtap="onRefreshTempleFairPublic" class="px-3 py-2 rounded-xl bg-white-10 text-gray-200 text-xs-mini font-bold active-bg-white-20">刷新</button>
+                          <view bindtap="onCloseTempleFairPublic" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                              <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+                          </view>
+                      </view>
+                  </view>
+                  <view class="bg-dark-800 border border-white-10 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto">
+                      <block wx:if="{{templeFairPublicLanternsLoading}}">
+                          <view class="text-xs text-gray-500">加载中...</view>
+                      </block>
+                      <block wx:else>
+                          <block wx:if="{{templeFairPublicLanterns && templeFairPublicLanterns.length}}">
+                              <view class="space-y-2">
+                                  <block wx:for="{{templeFairPublicLanterns}}" wx:key="recordId">
+                                      <view bindtap="onOpenPublicLanternResult" data-idx="{{index}}" class="flex items-center justify-between bg-black-50 border border-white-10 rounded-xl px-3 py-2 active-scale-95">
+                                          <view class="flex flex-col">
+                                              <text class="text-white text-sm font-bold break-words">{{item.title}}</text>
+                                              <text class="text-xs-mini text-gray-500 font-mono">{{item.date}}</text>
+                                          </view>
+                                          <image src="https://api.iconify.design/lucide:arrow-right.svg?color=%23d1d5db" class="w-4 h-4" />
+                                      </view>
+                                  </block>
+                              </view>
+                              <button bindtap="onLoadMoreTempleFairPublic" class="mt-3 w-full py-3 rounded-xl border border-white-10 bg-black-50 text-gray-300 text-sm font-bold active-scale-95">
+                                  更多
+                              </button>
+                          </block>
+                          <block wx:else>
+                              <view class="text-xs text-gray-500">暂无公开灯牌</view>
+                          </block>
+                      </block>
+                  </view>
+              </view>
+          </block>
+
+          <block wx:if="{{showTempleFairMemoryModal}}">
+              <view class="fixed inset-0 z-90 bg-black-95 backdrop-blur flex flex-col p-4 animate-fade-in safe-bottom" catchtouchmove="preventTouchMove">
+                  <view class="flex justify-between items-center mb-4" style="padding-top: {{statusBarHeight}}px;">
+                      <view class="flex flex-col">
+                          <text class="text-sm font-bold text-white">庙会游记</text>
+                          <text class="text-xs-mini text-gray-500">最近 14 天 · 情绪内存回放</text>
+                      </view>
+                      <view bindtap="onCloseTempleFairMemory" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                          <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+                      </view>
+                  </view>
+                  <view class="bg-dark-800 border border-white-10 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto">
+                      <block wx:if="{{templeFairMemoryDays && templeFairMemoryDays.length}}">
+                          <view class="space-y-2">
+                              <block wx:for="{{templeFairMemoryDays}}" wx:key="date">
+                                  <view class="bg-black-50 border border-white-10 rounded-xl px-3 py-2">
+                                      <view class="flex items-center justify-between">
+                                          <text class="text-xs-mini text-gray-500 font-mono">{{item.date}}</text>
+                                          <view class="flex items-center gap-2">
+                                              <block wx:if="{{item.sign && item.sign.recordId}}">
+                                                  <view class="px-2 py-1 rounded-full bg-neon-green-20 border border-neon-green-30 text-neon-green text-xs-mini font-mono">签</view>
+                                              </block>
+                                              <block wx:if="{{item.lantern && item.lantern.recordId}}">
+                                                  <view class="px-2 py-1 rounded-full bg-neon-blue-20 border border-neon-blue-30 text-neon-blue text-xs-mini font-mono">灯</view>
+                                              </block>
+                                              <block wx:if="{{item.stamp && item.stamp.recordId}}">
+                                                  <view class="px-2 py-1 rounded-full bg-neon-yellow-20 border border-neon-yellow-30 text-neon-yellow text-xs-mini font-mono">章</view>
+                                              </block>
+                                          </view>
+                                      </view>
+                                      <block wx:if="{{item.sign && item.sign.text}}">
+                                          <view class="mt-2">
+                                              <text class="text-white text-sm font-bold break-words">“{{item.sign.text}}”</text>
+                                          </view>
+                                      </block>
+                                      <view class="mt-2 flex items-center justify-between">
+                                          <view class="text-xs-mini text-gray-400">
+                                              <block wx:if="{{item.lantern && item.lantern.title}}">
+                                                  {{item.lantern.title}}
+                                              </block>
+                                              <block wx:elif="{{item.stamp && item.stamp.boothLabel}}">
+                                                  {{item.stamp.boothLabel}}
+                                              </block>
+                                          </view>
+                                          <button wx:if="{{item.sign && item.sign.recordId}}" bindtap="onOpenMemoryDaySign" data-idx="{{index}}" class="px-3 py-2 rounded-xl bg-white-10 text-gray-200 text-xs-mini font-bold active-bg-white-20">
+                                              回看
+                                          </button>
+                                      </view>
+                                  </view>
+                              </block>
+                          </view>
+                      </block>
+                      <block wx:else>
+                          <view class="text-xs text-gray-500">还没有记录，先去完成三件套日课</view>
+                      </block>
+                  </view>
+              </view>
+          </block>
+
+          <block wx:if="{{showLanternEditor}}">
+              <view class="fixed inset-0 z-100 bg-black-95 backdrop-blur flex flex-col p-4 animate-fade-in safe-bottom" catchtouchmove="preventTouchMove">
+                  <view class="flex justify-between items-center mb-4" style="padding-top: {{statusBarHeight}}px;">
+                      <text class="text-sm font-bold text-white">挂灯</text>
+                      <view bindtap="onCloseLanternEditor" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                          <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+                      </view>
+                  </view>
+
+                  <view class="bg-dark-800 border border-white-10 rounded-2xl p-4 flex-1 min-h-0 overflow-y-auto">
+                      <view class="text-xs text-gray-500 tracking-widest uppercase font-bold mb-2">灯牌标题</view>
+                      <input value="{{lanternTitleDraft}}" bindinput="onLanternTitleInput" maxlength="20" placeholder="给这盏灯起个名…" placeholder-class="text-gray-500" class="w-full bg-black-50 border border-white-10 rounded-xl px-4 py-3 text-white text-sm" />
+                      <view class="mt-4 flex items-center justify-between">
+                          <view class="flex flex-col">
+                              <text class="text-white text-sm font-bold">公开灯廊</text>
+                              <text class="text-xs-mini text-gray-500">默认私密；公开仅展示灯牌标题（已风控）</text>
+                          </view>
+                          <switch checked="{{lanternIsPublicDraft}}" bindchange="onLanternPublicChange" color="#00ffff" />
+                      </view>
+                      <button bindtap="onSaveLantern" class="mt-6 btn-neon-glow bg-gradient-green text-white py-3 rounded-xl font-bold active-scale-95">
+                          保存
+                      </button>
+                  </view>
+              </view>
+          </block>
+
+          <block wx:if="{{showStampBooths}}">
+              <view class="fixed inset-0 z-100 bg-black-95 backdrop-blur flex flex-col p-4 animate-fade-in safe-bottom" catchtouchmove="preventTouchMove">
+                  <view class="flex justify-between items-center mb-4" style="padding-top: {{statusBarHeight}}px;">
+                      <text class="text-sm font-bold text-white">选择摊位</text>
+                      <view bindtap="onCloseStampBooths" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                          <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+                      </view>
+                  </view>
+                  <view class="space-y-3 flex-1 min-h-0 overflow-y-auto">
+                      <block wx:for="{{templeFairBooths}}" wx:key="id">
+                          <view bindtap="onChooseStampBooth" data-id="{{item.id}}" class="rounded-2xl border border-white-10 bg-dark-800 p-4 active-scale-95">
+                              <view class="flex items-center justify-between">
+                                  <view class="flex flex-col">
+                                      <text class="text-white font-bold">{{item.label}}</text>
+                                      <text class="text-xs-mini text-gray-400">{{item.sub}}</text>
+                                  </view>
+                                  <image src="https://api.iconify.design/lucide:stamp.svg?color=%23fde047" class="w-5 h-5" />
+                              </view>
+                          </view>
+                      </block>
+                  </view>
+              </view>
+          </block>
+      </view>
   </block>
 
 </view>

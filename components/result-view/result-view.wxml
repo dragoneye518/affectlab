@@ -7,6 +7,24 @@
 
   <toast message="{{toastMessage}}" visible="{{showToast}}" />
 
+  <block wx:if="{{showFullText}}">
+      <view class="fixed inset-0 z-100 bg-black-95 backdrop-blur flex flex-col p-4 animate-fade-in safe-bottom">
+          <view class="flex justify-between items-center mb-4 z-10">
+              <text class="text-sm font-bold text-white">全文</text>
+              <view bindtap="onCloseFullText" class="p-2 bg-white-10 rounded-full active-bg-white-20 transition-colors">
+                  <image src="https://api.iconify.design/lucide:x.svg?color=white" class="w-5 h-5" />
+              </view>
+          </view>
+          <scroll-view scroll-y show-scrollbar="false" class="flex-1">
+              <view class="bg-white p-4 rounded-2xl border-2 border-black">
+                  <text class="font-serif {{fullTextSizeClass}} font-bold text-black leading-tight break-words block">
+                      "{{displayText}}"
+                  </text>
+              </view>
+          </scroll-view>
+      </view>
+  </block>
+
   <!-- Header -->
   <view class="flex justify-between items-center mb-2 z-10">
       <block wx:if="{{isSharedView}}">
@@ -76,9 +94,14 @@
               
               <!-- Text Content -->
               <view class="px-2">
-                  <text class="font-serif text-2xl font-bold text-black leading-tight mb-4 tracking-tight block line-clamp-2">
+                  <text bindtap="onOpenFullText" class="font-serif {{displayTextSizeClass}} font-bold text-black leading-tight mb-2 tracking-tight break-words block {{displayTextClampClass}}">
                       "{{displayText}}"
                   </text>
+                  <block wx:if="{{showReadMore}}">
+                      <view class="mb-3">
+                          <text bindtap="onOpenFullText" class="text-xs-mini font-mono text-gray-500 underline active-opacity">查看全文</text>
+                      </view>
+                  </block>
                   <view class="flex justify-between items-end border-t-2 border-black pt-2">
                       <view class="flex flex-col">
                           <text class="font-black text-xs text-black uppercase tracking-widest">Candy Pixel</text>

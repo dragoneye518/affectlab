@@ -19,6 +19,11 @@ Component({
   data: {
     timestampStr: '',
     displayText: '',
+    displayTextSizeClass: 'text-2xl',
+    displayTextClampClass: 'line-clamp-2',
+    showReadMore: false,
+    showFullText: false,
+    fullTextSizeClass: 'text-base',
     showToast: false,
     toastMessage: '',
     isSaving: false
@@ -52,9 +57,47 @@ Component({
         displayText = text;
         if (!displayText) displayText = subject;
       }
-      if (displayText.length > 16) displayText = displayText.slice(0, 16);
 
-      this.setData({ timestampStr: ts, displayText });
+      const charCount = Array.from(displayText).length;
+
+      let displayTextSizeClass = 'text-2xl';
+      let displayTextClampClass = 'line-clamp-2';
+      let showReadMore = false;
+      let fullTextSizeClass = 'text-base';
+
+      if (charCount <= 18) {
+        displayTextSizeClass = 'text-2xl';
+        displayTextClampClass = 'line-clamp-2';
+        fullTextSizeClass = 'text-base';
+      } else if (charCount <= 28) {
+        displayTextSizeClass = 'text-xl';
+        displayTextClampClass = 'line-clamp-3';
+        fullTextSizeClass = 'text-base';
+      } else if (charCount <= 40) {
+        displayTextSizeClass = 'text-lg';
+        displayTextClampClass = 'line-clamp-4';
+        fullTextSizeClass = 'text-base';
+      } else if (charCount <= 60) {
+        displayTextSizeClass = 'text-base';
+        displayTextClampClass = 'line-clamp-4';
+        showReadMore = true;
+        fullTextSizeClass = 'text-sm';
+      } else {
+        displayTextSizeClass = 'text-base';
+        displayTextClampClass = 'line-clamp-4';
+        showReadMore = true;
+        fullTextSizeClass = 'text-sm';
+      }
+
+      this.setData({
+        timestampStr: ts,
+        displayText,
+        displayTextSizeClass,
+        displayTextClampClass,
+        showReadMore,
+        showFullText: false,
+        fullTextSizeClass
+      });
     }
   },
   methods: {
@@ -67,6 +110,13 @@ Component({
     },
     onShare() {
       this.triggerEvent('share');
+    },
+    onOpenFullText() {
+      if (!this.data.displayText) return;
+      this.setData({ showFullText: true });
+    },
+    onCloseFullText() {
+      this.setData({ showFullText: false });
     },
     showToast(message) {
       this.setData({ showToast: true, toastMessage: message || '' });

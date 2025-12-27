@@ -1,4 +1,4 @@
-<view class="fixed inset-0 z-60 bg-dark-900-95 backdrop-blur flex flex-col p-6 animate-slide-in-bottom">
+<view class="fixed inset-0 z-90 bg-dark-900-95 backdrop-blur flex flex-col p-6 animate-slide-in-bottom">
   <!-- Header -->
   <view class="flex justify-between items-center mb-6">
       <view class="text-xl font-bold text-white flex items-center gap-2">

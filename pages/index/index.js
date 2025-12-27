@@ -48,7 +48,32 @@ Page({
     freeGenerateOnce: false,
     rerollBoostOnce: false,
     adTemplateId: null,
+    generatingApiPath: '',
+    generatingApiData: null,
+    returnViewAfterResult: null,
 
+    templeFairToday: '',
+    templeFairProgress: null,
+    templeFairTodayEntry: null,
+    templeFairAction: null,
+    showLanternEditor: false,
+    lanternTitleDraft: '',
+    lanternIsPublicDraft: false,
+    showStampBooths: false,
+    showTempleFairPublicModal: false,
+    showTempleFairMemoryModal: false,
+    templeFairStats: null,
+    templeFairStatsLoading: false,
+    templeFairPublicLanterns: [],
+    templeFairPublicLanternsOffset: 0,
+    templeFairPublicLanternsLoading: false,
+    templeFairMemoryDays: [],
+    templeFairBooths: [
+      { id: 'fortune', label: '抽签摊', sub: 'LUCK SIGN' },
+      { id: 'reply', label: '嘴替摊', sub: 'SHARP REPLY' },
+      { id: 'mask', label: '面具摊', sub: 'SOCIAL MASK' }
+    ],
+    
     // Categories Data
     categories: [
       { id: 'lucky', label: '能量指南', sub: 'LUCKY GUIDE', activeClass: 'cat-active-lucky' },
@@ -105,12 +130,239 @@ Page({
 
     this.loadTemplates();
     this.startBannerTimer();
+    this.refreshTempleFairToday();
 
     // Check Share URL
     if (params && params.open === 'ad') {
       this.onWatchAd();
     }
     this.applyPendingShareParams();
+  },
+
+  getTodayStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  refreshTempleFairToday() {
+    this.setData({ templeFairToday: this.getTodayStr() }, () => {
+      this.refreshTempleFairTodayEntry();
+    });
+  },
+
+  readTempleFairProgress() {
+    const raw = wx.getStorageSync('cp_temple_fair_progress');
+    if (!raw) return { eventId: '2026_temple_fair', days: [], updatedAt: Date.now() };
+    try {
+      const p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!p || typeof p !== 'object') return { eventId: '2026_temple_fair', days: [], updatedAt: Date.now() };
+      if (!Array.isArray(p.days)) p.days = [];
+      if (!p.eventId) p.eventId = '2026_temple_fair';
+      return p;
+    } catch (e) {
+      return { eventId: '2026_temple_fair', days: [], updatedAt: Date.now() };
+    }
+  },
+
+  writeTempleFairProgress(progress) {
+    const p = progress && typeof progress === 'object' ? progress : { eventId: '2026_temple_fair', days: [], updatedAt: Date.now() };
+    p.updatedAt = Date.now();
+    try {
+      wx.setStorageSync('cp_temple_fair_progress', JSON.stringify(p));
+    } catch (e) {}
+    this.setData({ templeFairProgress: p }, () => {
+      this.refreshTempleFairTodayEntry();
+      this.refreshTempleFairMemoryDays(p);
+    });
+  },
+
+  ensureTempleFairTodayEntry(progress) {
+    const p = progress && typeof progress === 'object' ? progress : { eventId: '2026_temple_fair', days: [] };
+    const today = this.data.templeFairToday || this.getTodayStr();
+    const days = Array.isArray(p.days) ? p.days : [];
+    let entry = days.find(x => x && x.date === today) || null;
+    if (!entry) {
+      entry = { date: today, sign: null, lantern: null, stamp: null };
+      p.days = [entry].concat(days).slice(0, 60);
+    }
+    return { progress: p, entry };
+  },
+
+  refreshTempleFairTodayEntry() {
+    const progress = this.data.templeFairProgress || this.readTempleFairProgress();
+    const { progress: next, entry } = this.ensureTempleFairTodayEntry(progress);
+    if (next !== progress) {
+      this.writeTempleFairProgress(next);
+      return;
+    }
+    this.setData({ templeFairTodayEntry: entry });
+  },
+
+  refreshTempleFairMemoryDays(progress) {
+    const p = progress && typeof progress === 'object' ? progress : (this.data.templeFairProgress || this.readTempleFairProgress());
+    const days = Array.isArray(p.days) ? p.days : [];
+    const list = days
+      .filter(d => d && typeof d === 'object' && (
+        (d.sign && d.sign.recordId) || (d.lantern && d.lantern.recordId) || (d.stamp && d.stamp.recordId)
+      ))
+      .slice(0, 14);
+    this.setData({ templeFairMemoryDays: list });
+  },
+
+  async syncTempleFairFromServer() {
+    if (!getAffectLabToken()) return;
+    try {
+      const res = await requestAffectLab({ path: '/event/temple_fair/status', method: 'GET' });
+      const progress = res?.data?.data?.progress;
+      if (res?.statusCode === 200 && progress && typeof progress === 'object') {
+        const merged = { ...this.readTempleFairProgress(), ...progress };
+        this.writeTempleFairProgress(merged);
+      }
+    } catch (e) {}
+  },
+
+  async loadTempleFairStats() {
+    if (this.data.templeFairStatsLoading) return;
+    this.setData({ templeFairStatsLoading: true });
+    try {
+      const res = await requestAffectLab({ path: '/event/temple_fair/stats', method: 'GET', auth: false });
+      const stats = res?.data?.data;
+      if (res?.statusCode === 200 && stats && typeof stats === 'object') {
+        this.setData({ templeFairStats: stats });
+      }
+    } catch (e) {} finally {
+      this.setData({ templeFairStatsLoading: false });
+    }
+  },
+
+  async loadTempleFairPublicLanterns(reset) {
+    if (this.data.templeFairPublicLanternsLoading) return;
+    const shouldReset = !!reset;
+    const offset = shouldReset ? 0 : (Number(this.data.templeFairPublicLanternsOffset) || 0);
+    this.setData({ templeFairPublicLanternsLoading: true });
+    try {
+      const res = await requestAffectLab({
+        path: '/event/temple_fair/lanterns/public',
+        method: 'GET',
+        auth: false,
+        data: { offset, limit: 10 }
+      });
+      const items = res?.data?.data?.items;
+      if (res?.statusCode === 200 && Array.isArray(items)) {
+        const next = shouldReset ? items : (this.data.templeFairPublicLanterns || []).concat(items);
+        this.setData({
+          templeFairPublicLanterns: next,
+          templeFairPublicLanternsOffset: offset + items.length
+        });
+      }
+    } catch (e) {} finally {
+      this.setData({ templeFairPublicLanternsLoading: false });
+    }
+  },
+
+  onRefreshTempleFairPublic() {
+    this.loadTempleFairPublicLanterns(true);
+  },
+
+  onLoadMoreTempleFairPublic() {
+    this.loadTempleFairPublicLanterns(false);
+  },
+
+  onOpenPublicLanternResult(e) {
+    const idx = Number(e?.currentTarget?.dataset?.idx);
+    const item = Number.isFinite(idx) ? (this.data.templeFairPublicLanterns || [])[idx] : null;
+    const result = item && typeof item === 'object' ? item.result : null;
+    if (!result || typeof result !== 'object') return;
+    this.setData({
+      showTempleFairPublicModal: false,
+      showTempleFairMemoryModal: false,
+      generatedResult: result,
+      view: 'RESULT',
+      resultReadOnly: true,
+      returnViewAfterResult: 'TEMPLE'
+    }, () => this.hideTabBarSafe());
+  },
+
+  onOpenMemoryDaySign(e) {
+    const idx = Number(e?.currentTarget?.dataset?.idx);
+    const day = Number.isFinite(idx) ? (this.data.templeFairMemoryDays || [])[idx] : null;
+    const sign = day && typeof day === 'object' ? day.sign : null;
+    if (!sign || typeof sign !== 'object' || !sign.recordId) return;
+    this.setData({
+      showTempleFairPublicModal: false,
+      showTempleFairMemoryModal: false,
+      generatedResult: {
+        id: sign.recordId,
+        templateId: 'custom-signal',
+        imageUrl: sign.imageUrl || '',
+        text: sign.text || '',
+        content: sign.content || '',
+        userInput: sign.userInput || '',
+        timestamp: sign.timestamp || Date.now(),
+        rarity: sign.rarity || 'N',
+        filterSeed: sign.filterSeed || 0,
+        luckScore: sign.luckScore || 0
+      },
+      view: 'RESULT',
+      resultReadOnly: true,
+      returnViewAfterResult: 'TEMPLE'
+    }, () => this.hideTabBarSafe());
+  },
+
+  onOpenTempleFair() {
+    const progress = this.readTempleFairProgress();
+    this.setData({
+      view: 'TEMPLE',
+      templeFairProgress: progress,
+      generatingApiPath: '',
+      generatingApiData: null,
+      returnViewAfterResult: null,
+      templeFairAction: null,
+      showTempleFairPublicModal: false,
+      showTempleFairMemoryModal: false
+    }, () => {
+      this.hideTabBarSafe();
+      this.refreshTempleFairToday();
+      this.refreshTempleFairMemoryDays(progress);
+      this.syncTempleFairFromServer();
+      this.loadTempleFairStats();
+    });
+  },
+
+  onCloseTempleFair() {
+    this.setData({
+      view: 'HOME',
+      showLanternEditor: false,
+      showStampBooths: false,
+      showTempleFairPublicModal: false,
+      showTempleFairMemoryModal: false,
+      templeFairAction: null
+    }, () => {
+      this.showTabBarSafe();
+    });
+  },
+
+  onOpenTempleFairPublic() {
+    this.setData({ showTempleFairPublicModal: true }, () => {
+      this.loadTempleFairPublicLanterns(true);
+    });
+  },
+
+  onCloseTempleFairPublic() {
+    this.setData({ showTempleFairPublicModal: false });
+  },
+
+  onOpenTempleFairMemory() {
+    const progress = this.data.templeFairProgress || this.readTempleFairProgress();
+    this.refreshTempleFairMemoryDays(progress);
+    this.setData({ showTempleFairMemoryModal: true });
+  },
+
+  onCloseTempleFairMemory() {
+    this.setData({ showTempleFairMemoryModal: false });
   },
 
   getTemplateById(templateId) {
@@ -210,15 +462,49 @@ Page({
   onShareAppMessage() {
     if (this.data.generatedResult && this.data.view === 'RESULT') {
       const res = this.data.generatedResult;
+      const isTempleFairResult = this.data.returnViewAfterResult === 'TEMPLE';
+      const safeSubject = isTempleFairResult ? this.getTempleFairShareSubject(res) : this.sanitizeShareSubject(res.userInput);
+      if (isTempleFairResult) {
+        return {
+          title: `赛博庙会·${safeSubject}`,
+          path: `/pages/index/index?tid=${res.templateId}&u=${encodeURIComponent(safeSubject)}&r=${res.rarity}&s=${res.luckScore}&tf=1`
+        };
+      }
       return {
-        title: `[${res.rarity}] ${res.userInput} 的运势评分: ${res.luckScore}`,
-        path: `/pages/index/index?tid=${res.templateId}&u=${encodeURIComponent(res.userInput)}&r=${res.rarity}&s=${res.luckScore}`
+        title: `[${res.rarity}] ${safeSubject} 的运势评分: ${res.luckScore}`,
+        path: `/pages/index/index?tid=${res.templateId}&u=${encodeURIComponent(safeSubject)}&r=${res.rarity}&s=${res.luckScore}`
       };
     }
     return {
       title: '赛博情绪实验室',
       path: '/pages/index/index'
     };
+  },
+
+  sanitizeShareSubject(raw) {
+    const s = String(raw || '').replace(/\r/g, ' ').replace(/\n/g, ' ').trim().replace(/\s+/g, ' ');
+    const t = (s || '匿名香客').slice(0, 20);
+    if (this.isTempleFairLanternTitleUnsafe(t)) return '匿名香客';
+    return t;
+  },
+
+  getTempleFairShareSubject(result) {
+    const rid = result && typeof result === 'object' ? String(result.id || '') : '';
+    const progress = this.data.templeFairProgress || this.readTempleFairProgress();
+    const days = Array.isArray(progress?.days) ? progress.days : [];
+    const hit = days.find(d => {
+      if (!d || typeof d !== 'object') return false;
+      const signRid = d?.sign?.recordId ? String(d.sign.recordId) : '';
+      const lanternRid = d?.lantern?.recordId ? String(d.lantern.recordId) : '';
+      const stampRid = d?.stamp?.recordId ? String(d.stamp.recordId) : '';
+      return (rid && (rid === signRid || rid === lanternRid || rid === stampRid));
+    }) || null;
+    const title = hit?.lantern?.title ? String(hit.lantern.title) : '';
+    if (title) return this.sanitizeShareSubject(title);
+    const signText = hit?.sign?.text ? String(hit.sign.text) : '';
+    if (signText) return this.sanitizeShareSubject(signText);
+    const fallback = String(result?.content || result?.text || '') || '匿名香客';
+    return this.sanitizeShareSubject(fallback);
   },
 
   updateTemplates() {
@@ -324,10 +610,8 @@ Page({
   },
   
   onCustomSignalSelect() {
-    const custom = this.getTemplateById('custom-signal');
-    if (custom) {
-      this.setData({ selectedTemplate: custom, isInputting: true });
-    }
+    const custom = this.getTemplateById('custom-signal') || this.getFallbackCustomSignalTemplate();
+    this.setData({ selectedTemplate: custom, isInputting: true });
   },
   
   closeInput() {
@@ -337,6 +621,26 @@ Page({
   async onInputConfirm(e) {
     const text = e.detail.text;
     const { selectedTemplate, candyCount } = this.data;
+
+    if (this.data.templeFairAction === 'SIGN') {
+      if (!getAffectLabToken()) await affectLabLogin();
+      if (!getAffectLabToken()) {
+        wx.showToast({ title: '登录失败，请检查后端服务', icon: 'none' });
+        this.setData({ templeFairAction: null, isInputting: false });
+        return;
+      }
+      this.setData({
+        userInput: text,
+        isInputting: false,
+        view: 'GENERATING',
+        freeGenerateOnce: false,
+        rerollBoostOnce: false,
+        generatingApiPath: '/event/temple_fair/daily_draw',
+        generatingApiData: { userInput: text },
+        returnViewAfterResult: 'TEMPLE'
+      });
+      return;
+    }
     
     if (candyCount < selectedTemplate.cost) {
       this.setData({ isInputting: false, adType: 'CANDY', showAd: true, adTimeLeft: 5 });
@@ -354,7 +658,10 @@ Page({
       userInput: text,
       isInputting: false,
       view: 'GENERATING',
-      freeGenerateOnce: false
+      freeGenerateOnce: false,
+      generatingApiPath: '',
+      generatingApiData: null,
+      returnViewAfterResult: this.data.templeFairAction ? 'TEMPLE' : null
     });
   },
   
@@ -368,13 +675,23 @@ Page({
   onGenerationFinish(e) {
     const res = e.detail.result;
     const balance = e && e.detail ? e.detail.balance : undefined;
+    const templeAction = this.data.templeFairAction;
+    if (templeAction === 'SIGN') {
+      this.applyTempleSignResult(res);
+    } else if (templeAction && templeAction.startsWith('STAMP:')) {
+      const boothId = templeAction.split(':')[1] || '';
+      this.applyTempleStampResult(res, boothId);
+    }
     this.setData({
       generatedResult: res,
       view: 'RESULT',
       resultReadOnly: false,
       freeGenerateOnce: false,
       rerollBoostOnce: false,
-      candyCount: typeof balance === 'number' ? balance : this.data.candyCount
+      candyCount: typeof balance === 'number' ? balance : this.data.candyCount,
+      generatingApiPath: '',
+      generatingApiData: null,
+      templeFairAction: null
     }, () => {
       this.hideTabBarSafe();
     });
@@ -382,8 +699,17 @@ Page({
   },
 
   onGenerationError(e) {
-    this.setData({ view: 'HOME', freeGenerateOnce: false, rerollBoostOnce: false });
-    this.showTabBarSafe();
+    const back = this.data.returnViewAfterResult || (this.data.view === 'TEMPLE' ? 'TEMPLE' : 'HOME');
+    this.setData({
+      view: back,
+      freeGenerateOnce: false,
+      rerollBoostOnce: false,
+      generatingApiPath: '',
+      generatingApiData: null,
+      templeFairAction: null,
+      isInputting: false
+    });
+    if (back === 'HOME') this.showTabBarSafe();
     wx.showToast({ title: e?.detail?.message || '生成失败，请检查后端服务', icon: 'none' });
   },
 
@@ -402,8 +728,237 @@ Page({
   },
   
   closeResult() {
-    this.setData({ view: 'HOME', freeGenerateOnce: false, rerollBoostOnce: false, resultReadOnly: false, adTemplateId: null });
-    this.showTabBarSafe();
+    const back = this.data.returnViewAfterResult || 'HOME';
+    this.setData({
+      view: back,
+      freeGenerateOnce: false,
+      rerollBoostOnce: false,
+      resultReadOnly: false,
+      adTemplateId: null,
+      returnViewAfterResult: null,
+      generatingApiPath: '',
+      generatingApiData: null
+    });
+    if (back === 'HOME') this.showTabBarSafe();
+  },
+
+  getTempleSignTemplate() {
+    return this.getTemplateById('custom-signal') || this.getFallbackCustomSignalTemplate();
+  },
+
+  getFallbackCustomSignalTemplate() {
+    return {
+      id: 'custom-signal',
+      title: '今日一签',
+      subtitle: '',
+      tag: '',
+      assets: {},
+      imageUrl: '',
+      cost: 0,
+      category: '',
+      inputHint: '输入你的任何情绪 (如: 不想上班, 前任找我)...',
+      quickPrompts: [],
+      description: '',
+      keywords: [],
+      presetTexts: []
+    };
+  },
+
+  onTempleDailyDraw() {
+    const entry = this.data.templeFairTodayEntry;
+    if (entry && entry.sign && entry.sign.recordId) {
+      this.setData({
+        generatedResult: {
+          id: entry.sign.recordId,
+          templateId: 'custom-signal',
+          imageUrl: entry.sign.imageUrl || '',
+          text: entry.sign.text || '',
+          content: entry.sign.content || '',
+          userInput: entry.sign.userInput || '',
+          timestamp: entry.sign.timestamp || Date.now(),
+          rarity: entry.sign.rarity || 'N',
+          filterSeed: entry.sign.filterSeed || 0,
+          luckScore: entry.sign.luckScore || 0
+        },
+        view: 'RESULT',
+        resultReadOnly: true,
+        returnViewAfterResult: 'TEMPLE'
+      }, () => this.hideTabBarSafe());
+      return;
+    }
+    const t = this.getTempleSignTemplate();
+    if (!t) {
+      wx.showToast({ title: '签文模板缺失', icon: 'none' });
+      return;
+    }
+    this.setData({ selectedTemplate: t, isInputting: true, templeFairAction: 'SIGN' });
+  },
+
+  applyTempleSignResult(res) {
+    const progress = this.readTempleFairProgress();
+    const { progress: p, entry } = this.ensureTempleFairTodayEntry(progress);
+    const displayText = (res && res.templateId === 'custom-signal') ? (String(res.content || '').trim() || String(res.text || '').trim()) : String(res.text || '').trim();
+    entry.sign = {
+      recordId: res?.id || '',
+      text: displayText,
+      content: res?.content || '',
+      userInput: res?.userInput || '',
+      imageUrl: res?.imageUrl || '',
+      timestamp: res?.timestamp || Date.now(),
+      rarity: res?.rarity || 'N',
+      filterSeed: res?.filterSeed || 0,
+      luckScore: res?.luckScore || 0
+    };
+    this.writeTempleFairProgress(p);
+  },
+
+  onOpenLanternEditor() {
+    const entry = this.data.templeFairTodayEntry;
+    if (!entry || !entry.sign || !entry.sign.recordId) {
+      wx.showToast({ title: '先完成今日一签', icon: 'none' });
+      return;
+    }
+    const current = entry.lantern || {};
+    const draftTitle = current.title || '香火已上链';
+    this.setData({
+      showLanternEditor: true,
+      lanternTitleDraft: draftTitle,
+      lanternIsPublicDraft: !!current.isPublic
+    });
+  },
+
+  onCloseLanternEditor() {
+    this.setData({ showLanternEditor: false });
+  },
+
+  onLanternTitleInput(e) {
+    this.setData({ lanternTitleDraft: e?.detail?.value || '' });
+  },
+
+  onLanternPublicChange(e) {
+    this.setData({ lanternIsPublicDraft: !!(e && e.detail ? e.detail.value : false) });
+  },
+
+  normalizeTempleFairLanternTitle(raw) {
+    const s = String(raw || '').replace(/\r/g, ' ').replace(/\n/g, ' ').trim().replace(/\s+/g, ' ');
+    return (s || '香火已上链').slice(0, 20);
+  },
+
+  isTempleFairLanternTitleUnsafe(title) {
+    const t = String(title || '').trim();
+    if (!t) return false;
+    const patterns = [
+      /(https?:\/\/|www\.)/i,
+      /\b[a-z0-9-]+\.(com|cn|net|org|io|cc)\b/i,
+      /(?:\+?86[-\s]?)?1[3-9]\d{9}/,
+      /(微信|vx|v信|wechat|qq|加群|群号|私聊|联系我)/i
+    ];
+    return patterns.some(r => r.test(t));
+  },
+
+  onSaveLantern() {
+    const entry = this.data.templeFairTodayEntry;
+    if (!entry || !entry.sign || !entry.sign.recordId) return;
+    const isPublic = !!this.data.lanternIsPublicDraft;
+    const title = this.normalizeTempleFairLanternTitle(this.data.lanternTitleDraft);
+    if (isPublic && this.isTempleFairLanternTitleUnsafe(title)) {
+      wx.showToast({ title: '公开标题不安全，请修改', icon: 'none' });
+      return;
+    }
+    const progress = this.readTempleFairProgress();
+    const { progress: p, entry: todayEntry } = this.ensureTempleFairTodayEntry(progress);
+    const prevLantern = todayEntry.lantern && typeof todayEntry.lantern === 'object' ? { ...todayEntry.lantern } : null;
+    todayEntry.lantern = { recordId: entry.sign.recordId, title, isPublic };
+    this.writeTempleFairProgress(p);
+    this.setData({ showLanternEditor: false });
+    if (getAffectLabToken()) {
+      requestAffectLab({
+        path: '/event/temple_fair/lantern',
+        method: 'POST',
+        data: { recordId: entry.sign.recordId, title, isPublic }
+      }).then((res) => {
+        if (res?.statusCode === 200) return;
+        const msg = (res?.data && (res.data.detail || res.data.msg)) || '挂灯失败';
+        const latest = this.readTempleFairProgress();
+        const { progress: p2, entry: e2 } = this.ensureTempleFairTodayEntry(latest);
+        e2.lantern = prevLantern;
+        this.writeTempleFairProgress(p2);
+        wx.showToast({ title: String(msg).slice(0, 20), icon: 'none' });
+      }).catch(() => {
+        const latest = this.readTempleFairProgress();
+        const { progress: p2, entry: e2 } = this.ensureTempleFairTodayEntry(latest);
+        e2.lantern = prevLantern;
+        this.writeTempleFairProgress(p2);
+        wx.showToast({ title: '后端不可达，已回退', icon: 'none' });
+      });
+    }
+    wx.showToast({ title: '挂灯成功', icon: 'none' });
+  },
+
+  onOpenStampBooths() {
+    const entry = this.data.templeFairTodayEntry;
+    if (!entry || !entry.sign || !entry.sign.recordId) {
+      wx.showToast({ title: '先完成今日一签', icon: 'none' });
+      return;
+    }
+    this.setData({ showStampBooths: true });
+  },
+
+  onCloseStampBooths() {
+    this.setData({ showStampBooths: false });
+  },
+
+  pickBoothTemplate(boothId) {
+    const templates = this.data.templates || [];
+    const byId = (id) => templates.find(t => t && t.id === id) || null;
+    if (boothId === 'fortune') return byId('cyber-fortune') || byId('energy-daily') || byId('custom-signal');
+    if (boothId === 'reply') return byId('relative-shield') || byId('roast-boss') || byId('diet-excuse');
+    if (boothId === 'mask') return byId('mbti-meme') || byId('rich-vibe') || byId('clown-cert');
+    return templates[0] || null;
+  },
+
+  onChooseStampBooth(e) {
+    const boothId = e?.currentTarget?.dataset?.id;
+    const booth = (this.data.templeFairBooths || []).find(x => x && x.id === boothId) || null;
+    const t = this.pickBoothTemplate(boothId);
+    if (!t) {
+      wx.showToast({ title: '摊位模板缺失', icon: 'none' });
+      return;
+    }
+    this.setData({
+      showStampBooths: false,
+      selectedTemplate: t,
+      isInputting: true,
+      templeFairAction: `STAMP:${boothId}`,
+      _templeStampBoothLabel: booth ? booth.label : ''
+    });
+  },
+
+  applyTempleStampResult(res, boothId) {
+    const booth = (this.data.templeFairBooths || []).find(x => x && x.id === boothId) || null;
+    const progress = this.readTempleFairProgress();
+    const { progress: p, entry } = this.ensureTempleFairTodayEntry(progress);
+    entry.stamp = {
+      recordId: res?.id || '',
+      boothId: boothId,
+      boothLabel: booth ? booth.label : (this.data._templeStampBoothLabel || ''),
+      templateId: res?.templateId || '',
+      rarity: res?.rarity || 'N'
+    };
+    this.writeTempleFairProgress(p);
+    if (getAffectLabToken()) {
+      requestAffectLab({
+        path: '/event/temple_fair/stamp',
+        method: 'POST',
+        data: {
+          recordId: res?.id || '',
+          boothId: boothId,
+          boothLabel: booth ? booth.label : (this.data._templeStampBoothLabel || ''),
+          templateId: res?.templateId || '',
+          rarity: res?.rarity || 'N'
+        }
+      }).catch(() => {});
+    }
   },
   
   startReroll() {

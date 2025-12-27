@@ -31,6 +31,8 @@ logger = logging.getLogger("AffectLabServer")
 
 app = FastAPI(title="AffectLab Server", description="Gateway + Business Service")
 
+_TEMPLE_FAIR_EVENT_ID = "2026_temple_fair"
+
 @app.middleware("http")
 async def _log_incoming(request: Request, call_next):
     start = time.time()
@@ -142,6 +144,24 @@ def _ensure_business_schema(db) -> None:
                 INDEX idx_template_id (template_id),
                 INDEX idx_created_at (created_at),
                 INDEX idx_rarity (rarity)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        )
+    )
+
+    db.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS affectlab_temple_fair_progress (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                event_id VARCHAR(64) NOT NULL,
+                progress JSON NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_user_event (user_id, event_id),
+                INDEX idx_user_id (user_id),
+                INDEX idx_event_id (event_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             """
         )
@@ -650,6 +670,180 @@ class GenerateRequest(BaseModel):
     reroll: bool | None = None
 
 
+class TempleFairDailyDrawRequest(BaseModel):
+    userInput: str
+
+
+class TempleFairLanternRequest(BaseModel):
+    recordId: str
+    title: str | None = None
+    isPublic: bool | None = None
+
+
+class TempleFairStampRequest(BaseModel):
+    recordId: str
+    boothId: str
+    boothLabel: str | None = None
+    templateId: str | None = None
+    rarity: str | None = None
+
+
+def _safe_json_loads(s):
+    if not s:
+        return None
+    try:
+        return json.loads(s) if isinstance(s, str) else s
+    except Exception:
+        return None
+
+
+def _extract_filter_seed(meta) -> int:
+    try:
+        m = _safe_json_loads(meta)
+        if isinstance(m, dict) and "filterSeed" in m:
+            return int(m.get("filterSeed") or 0)
+    except Exception:
+        return 0
+    return 0
+
+
+def _today_str() -> str:
+    return datetime.date.today().isoformat()
+
+
+def _load_temple_fair_progress(db, user_id: int) -> dict:
+    _ensure_business_schema(db)
+    row = (
+        db.execute(
+            text(
+                """
+                SELECT progress
+                FROM affectlab_temple_fair_progress
+                WHERE user_id = :uid AND event_id = :eid
+                LIMIT 1
+                """
+            ),
+            {"uid": int(user_id), "eid": _TEMPLE_FAIR_EVENT_ID},
+        )
+        .mappings()
+        .first()
+    )
+    raw = row.get("progress") if row else None
+    p = _safe_json_loads(raw)
+    if not isinstance(p, dict):
+        p = {"eventId": _TEMPLE_FAIR_EVENT_ID, "days": [], "updatedAt": int(time.time() * 1000)}
+    if not p.get("eventId"):
+        p["eventId"] = _TEMPLE_FAIR_EVENT_ID
+    if not isinstance(p.get("days"), list):
+        p["days"] = []
+    if not isinstance(p.get("updatedAt"), int):
+        p["updatedAt"] = int(time.time() * 1000)
+    return p
+
+
+def _save_temple_fair_progress(db, user_id: int, progress: dict) -> dict:
+    _ensure_business_schema(db)
+    p = progress if isinstance(progress, dict) else {"eventId": _TEMPLE_FAIR_EVENT_ID, "days": []}
+    if not p.get("eventId"):
+        p["eventId"] = _TEMPLE_FAIR_EVENT_ID
+    if not isinstance(p.get("days"), list):
+        p["days"] = []
+    p["updatedAt"] = int(time.time() * 1000)
+    payload = json.dumps(p, ensure_ascii=False)
+    db.execute(
+        text(
+            """
+            INSERT INTO affectlab_temple_fair_progress(user_id, event_id, progress)
+            VALUES (:uid, :eid, :p)
+            ON DUPLICATE KEY UPDATE progress = :p
+            """
+        ),
+        {"uid": int(user_id), "eid": _TEMPLE_FAIR_EVENT_ID, "p": payload},
+    )
+    db.commit()
+    return p
+
+
+def _ensure_today_entry(progress: dict, today: str) -> tuple[dict, dict]:
+    p = progress if isinstance(progress, dict) else {"eventId": _TEMPLE_FAIR_EVENT_ID, "days": []}
+    days = p.get("days") if isinstance(p.get("days"), list) else []
+    entry = next((x for x in days if isinstance(x, dict) and x.get("date") == today), None)
+    if not entry:
+        entry = {"date": today, "sign": None, "lantern": None, "stamp": None}
+        p["days"] = [entry] + [x for x in days if isinstance(x, dict)][:59]
+    return p, entry
+
+
+_PUBLIC_LANTERN_ALLOWED_TEMPLATES: set[str] = {"custom-signal"}
+
+_PUBLIC_LANTERN_BLOCK_TITLE_PATTERNS = [
+    re.compile(r"(https?://|www\.)", re.I),
+    re.compile(r"\b[a-z0-9-]+\.(com|cn|net|org|io|cc)\b", re.I),
+    re.compile(r"(?:\+?86[-\s]?)?1[3-9]\d{9}"),
+    re.compile(r"(微信|vx|v信|wechat|qq|加群|群号|私聊|联系我)", re.I),
+]
+
+
+def _sanitize_lantern_title(raw_title: str | None) -> str:
+    t = str(raw_title or "").replace("\r", " ").replace("\n", " ").strip()
+    t = re.sub(r"\s+", " ", t)
+    if not t:
+        t = "香火已上链"
+    return t[:20]
+
+
+def _is_risky_public_lantern_title(title: str) -> bool:
+    t = str(title or "").strip()
+    if not t:
+        return False
+    for pat in _PUBLIC_LANTERN_BLOCK_TITLE_PATTERNS:
+        if pat.search(t):
+            return True
+    return False
+
+
+def _build_card_result_from_record(r: dict) -> dict:
+    ts = int(r["created_at"].timestamp() * 1000) if r.get("created_at") else int(time.time() * 1000)
+    return {
+        "id": r["record_id"],
+        "templateId": r.get("template_id") or "",
+        "imageUrl": r.get("image_url") or "",
+        "text": r.get("ai_text") or "",
+        "content": r.get("content") or "",
+        "userInput": r.get("user_input") or "",
+        "timestamp": ts,
+        "rarity": r.get("rarity") or "N",
+        "filterSeed": _extract_filter_seed(r.get("meta")),
+        "luckScore": int(r.get("luck_score") or 0),
+    }
+
+
+def _build_public_card_result_from_record(r: dict, public_subject: str = "") -> dict:
+    ts = int(r["created_at"].timestamp() * 1000) if r.get("created_at") else int(time.time() * 1000)
+    template_id = r.get("template_id") or ""
+    ai_text = str(r.get("ai_text") or "")
+    content = str(r.get("content") or "")
+    if template_id == "custom-signal":
+        ai_text = ""
+    else:
+        content = ""
+    subject = _sanitize_lantern_title(public_subject) if public_subject else ""
+    if not subject:
+        subject = "匿名香客"
+    return {
+        "id": r["record_id"],
+        "templateId": template_id,
+        "imageUrl": r.get("image_url") or "",
+        "text": ai_text,
+        "content": content,
+        "userInput": subject,
+        "timestamp": ts,
+        "rarity": r.get("rarity") or "N",
+        "filterSeed": _extract_filter_seed(r.get("meta")),
+        "luckScore": int(r.get("luck_score") or 0),
+    }
+
+
 @app.post("/affectlab/api/cards/generate")
 def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     _sync_templates(db)
@@ -872,6 +1066,313 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
         )
     logger.info("DB read cards count=%s user_id=%s", len(items), int(user_id or 0))
     return {"code": 200, "data": {"items": items}}
+
+
+@app.get("/affectlab/api/event/temple_fair/status")
+def temple_fair_status(request: Request, db=Depends(get_db)):
+    user_id = get_current_user_id(request)
+    progress = _load_temple_fair_progress(db, user_id)
+    return {"code": 200, "data": {"progress": progress}}
+
+
+@app.post("/affectlab/api/event/temple_fair/daily_draw")
+def temple_fair_daily_draw(req: TempleFairDailyDrawRequest, request: Request, db=Depends(get_db)):
+    user_id = get_current_user_id(request)
+    today = _today_str()
+    progress = _load_temple_fair_progress(db, user_id)
+    progress, entry = _ensure_today_entry(progress, today)
+    sign = entry.get("sign") if isinstance(entry, dict) else None
+    if isinstance(sign, dict) and sign.get("recordId"):
+        row = (
+            db.execute(
+                text(
+                    """
+                    SELECT record_id, template_id, user_input, ai_text, content, rarity, luck_score, image_url, meta, created_at
+                    FROM affectlab_emotion_card_record
+                    WHERE user_id = :uid AND record_id = :rid
+                    LIMIT 1
+                    """
+                ),
+                {"uid": int(user_id), "rid": str(sign.get("recordId"))},
+            )
+            .mappings()
+            .first()
+        )
+        if row:
+            bal = db.execute(text("SELECT balance FROM affectlab_user_balance WHERE user_id = :uid"), {"uid": user_id}).scalar()
+            return {"code": 200, "data": {"result": _build_card_result_from_record(dict(row)), "balance": int(bal or 0)}}
+
+    gen = generate_card(
+        GenerateRequest(templateId="custom-signal", userInput=req.userInput, free=True, reroll=False),
+        request,
+        db,
+    )
+    result = gen.get("data", {}).get("result") if isinstance(gen, dict) else None
+    if isinstance(result, dict) and result.get("id"):
+        entry["sign"] = {
+            "recordId": result.get("id") or "",
+            "text": (str(result.get("content") or "").strip() or str(result.get("text") or "").strip()),
+            "content": result.get("content") or "",
+            "userInput": result.get("userInput") or "",
+            "imageUrl": result.get("imageUrl") or "",
+            "timestamp": int(result.get("timestamp") or int(time.time() * 1000)),
+            "rarity": result.get("rarity") or "N",
+            "filterSeed": int(result.get("filterSeed") or 0),
+            "luckScore": int(result.get("luckScore") or 0),
+        }
+        _save_temple_fair_progress(db, user_id, progress)
+    return gen
+
+
+@app.post("/affectlab/api/event/temple_fair/lantern")
+def temple_fair_lantern(req: TempleFairLanternRequest, request: Request, db=Depends(get_db)):
+    user_id = get_current_user_id(request)
+    rid = (req.recordId or "").strip()
+    if not rid:
+        raise HTTPException(status_code=400, detail="Empty recordId")
+    row = (
+        db.execute(
+            text(
+                """
+                SELECT record_id, template_id
+                FROM affectlab_emotion_card_record
+                WHERE user_id = :uid AND record_id = :rid
+                LIMIT 1
+                """
+            ),
+            {"uid": int(user_id), "rid": rid},
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Record Not Found")
+    template_id = str(row.get("template_id") or "").strip()
+    if template_id not in _PUBLIC_LANTERN_ALLOWED_TEMPLATES:
+        raise HTTPException(status_code=400, detail="Invalid record template")
+
+    is_public = bool(req.isPublic)
+    title = _sanitize_lantern_title(req.title)
+    if is_public and _is_risky_public_lantern_title(title):
+        raise HTTPException(status_code=400, detail="Unsafe title")
+
+    today = _today_str()
+    progress = _load_temple_fair_progress(db, user_id)
+    progress, entry = _ensure_today_entry(progress, today)
+    sign = entry.get("sign") if isinstance(entry, dict) else None
+    sign_rid = str(sign.get("recordId") or "").strip() if isinstance(sign, dict) else ""
+    if not sign_rid:
+        raise HTTPException(status_code=400, detail="Sign Not Completed")
+    if sign_rid != rid:
+        raise HTTPException(status_code=400, detail="RecordId Not Today's Sign")
+    entry["lantern"] = {"recordId": rid, "title": title, "isPublic": is_public}
+    saved = _save_temple_fair_progress(db, user_id, progress)
+    return {"code": 200, "data": {"progress": saved}}
+
+
+@app.post("/affectlab/api/event/temple_fair/stamp")
+def temple_fair_stamp(req: TempleFairStampRequest, request: Request, db=Depends(get_db)):
+    user_id = get_current_user_id(request)
+    rid = (req.recordId or "").strip()
+    if not rid:
+        raise HTTPException(status_code=400, detail="Empty recordId")
+    exists = db.execute(
+        text("SELECT 1 FROM affectlab_emotion_card_record WHERE user_id = :uid AND record_id = :rid LIMIT 1"),
+        {"uid": int(user_id), "rid": rid},
+    ).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record Not Found")
+
+    booth_id = (req.boothId or "").strip()
+    if not booth_id:
+        raise HTTPException(status_code=400, detail="Empty boothId")
+
+    booth_label = (req.boothLabel or "").strip()[:20]
+    template_id = (req.templateId or "").strip()[:64]
+    rarity = (req.rarity or "").strip()[:8]
+
+    today = _today_str()
+    progress = _load_temple_fair_progress(db, user_id)
+    progress, entry = _ensure_today_entry(progress, today)
+    entry["stamp"] = {
+        "recordId": rid,
+        "boothId": booth_id,
+        "boothLabel": booth_label,
+        "templateId": template_id,
+        "rarity": rarity,
+    }
+    saved = _save_temple_fair_progress(db, user_id, progress)
+    return {"code": 200, "data": {"progress": saved}}
+
+
+def _read_public_lantern_index(db, scan_rows: int) -> list[dict]:
+    _ensure_business_schema(db)
+    n = max(1, min(int(scan_rows or 0), 5000))
+    rows = (
+        db.execute(
+            text(
+                """
+                SELECT progress, updated_at
+                FROM affectlab_temple_fair_progress
+                WHERE event_id = :eid
+                ORDER BY updated_at DESC
+                LIMIT :lim
+                """
+            ),
+            {"eid": _TEMPLE_FAIR_EVENT_ID, "lim": n},
+        )
+        .mappings()
+        .all()
+    )
+    items: list[dict] = []
+    seen: set[str] = set()
+    for r in rows:
+        p = _safe_json_loads(r.get("progress"))
+        if not isinstance(p, dict):
+            continue
+        updated_at = r.get("updated_at")
+        updated_ms = int(updated_at.timestamp() * 1000) if updated_at else int(time.time() * 1000)
+        days = p.get("days")
+        if not isinstance(days, list):
+            continue
+        for d in days:
+            if not isinstance(d, dict):
+                continue
+            lantern = d.get("lantern")
+            if not isinstance(lantern, dict):
+                continue
+            if not bool(lantern.get("isPublic")):
+                continue
+            rid = str(lantern.get("recordId") or "").strip()
+            if not rid or rid in seen:
+                continue
+            title = _sanitize_lantern_title(lantern.get("title"))
+            if _is_risky_public_lantern_title(title):
+                continue
+            seen.add(rid)
+            items.append(
+                {
+                    "recordId": rid,
+                    "title": title,
+                    "date": str(d.get("date") or ""),
+                    "updatedAt": updated_ms,
+                }
+            )
+    items.sort(key=lambda x: ((x.get("date") or ""), int(x.get("updatedAt") or 0)), reverse=True)
+    return items
+
+
+def _fetch_records_by_ids(db, record_ids: list[str]) -> dict[str, dict]:
+    ids: list[str] = []
+    for x in (record_ids or []):
+        if x is None:
+            continue
+        s = str(x).strip()
+        if s and s.lower() != "none":
+            ids.append(s)
+    if not ids:
+        return {}
+    placeholders = ", ".join([f":rid{i}" for i in range(len(ids))])
+    params = {f"rid{i}": ids[i] for i in range(len(ids))}
+    sql = f"""
+        SELECT record_id, template_id, user_input, ai_text, content, rarity, luck_score, image_url, meta, created_at
+        FROM affectlab_emotion_card_record
+        WHERE record_id IN ({placeholders})
+    """
+    rows = db.execute(text(sql), params).mappings().all()
+    return {str(r.get("record_id") or ""): dict(r) for r in rows if r and r.get("record_id")}
+
+
+@app.get("/affectlab/api/event/temple_fair/lanterns/public")
+def temple_fair_public_lanterns(limit: int = 20, offset: int = 0, db=Depends(get_db)):
+    lim = max(1, min(int(limit or 0), 50))
+    off = max(0, int(offset or 0))
+    idx = _read_public_lantern_index(db, scan_rows=2000)
+    page = idx[off : off + lim]
+    record_map = _fetch_records_by_ids(db, [x.get("recordId") for x in page])
+    items: list[dict] = []
+    for x in page:
+        rid = str(x.get("recordId") or "")
+        rec = record_map.get(rid)
+        if not rec:
+            continue
+        template_id = str(rec.get("template_id") or "").strip()
+        if template_id not in _PUBLIC_LANTERN_ALLOWED_TEMPLATES:
+            continue
+        items.append(
+            {
+                "recordId": rid,
+                "title": x.get("title") or "",
+                "date": x.get("date") or "",
+                "updatedAt": int(x.get("updatedAt") or 0),
+                "result": _build_public_card_result_from_record(rec, public_subject=str(x.get("title") or "")),
+            }
+        )
+    return {"code": 200, "data": {"items": items, "offset": off, "limit": lim}}
+
+
+@app.get("/affectlab/api/event/temple_fair/stats")
+def temple_fair_stats(db=Depends(get_db)):
+    _ensure_business_schema(db)
+    users = db.execute(
+        text("SELECT COUNT(*) FROM affectlab_temple_fair_progress WHERE event_id = :eid"),
+        {"eid": _TEMPLE_FAIR_EVENT_ID},
+    ).scalar()
+    today = _today_str()
+    idx = _read_public_lantern_index(db, scan_rows=2000)
+    today_public = sum(1 for x in idx if (x.get("date") or "") == today)
+
+    today_sign = 0
+    today_stamp = 0
+    try:
+        rows = (
+            db.execute(
+                text(
+                    """
+                    SELECT progress
+                    FROM affectlab_temple_fair_progress
+                    WHERE event_id = :eid
+                    ORDER BY updated_at DESC
+                    LIMIT 2000
+                    """
+                ),
+                {"eid": _TEMPLE_FAIR_EVENT_ID},
+            )
+            .mappings()
+            .all()
+        )
+        for r in rows:
+            p = _safe_json_loads(r.get("progress"))
+            if not isinstance(p, dict):
+                continue
+            days = p.get("days")
+            if not isinstance(days, list):
+                continue
+            entry = next((d for d in days if isinstance(d, dict) and d.get("date") == today), None)
+            if not entry:
+                continue
+            sign = entry.get("sign")
+            if isinstance(sign, dict) and str(sign.get("recordId") or "").strip():
+                today_sign += 1
+            stamp = entry.get("stamp")
+            if isinstance(stamp, dict) and str(stamp.get("recordId") or "").strip():
+                today_stamp += 1
+    except Exception:
+        today_sign = 0
+        today_stamp = 0
+
+    return {
+        "code": 200,
+        "data": {
+            "eventId": _TEMPLE_FAIR_EVENT_ID,
+            "today": today,
+            "users": int(users or 0),
+            "publicLanterns": int(len(idx)),
+            "todayPublicLanterns": int(today_public),
+            "todaySigns": int(today_sign),
+            "todayStamps": int(today_stamp),
+        },
+    }
 
 
 def _run():
