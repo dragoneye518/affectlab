@@ -18,17 +18,43 @@ Component({
   },
   data: {
     timestampStr: '',
+    displayText: '',
     showToast: false,
     toastMessage: '',
     isSaving: false
   },
   observers: {
     'result': function(res) {
-      if (res && res.timestamp) {
-        this.setData({
-          timestampStr: new Date(res.timestamp).toLocaleDateString()
-        });
+      if (!res) return;
+      const ts = res && res.timestamp ? new Date(res.timestamp).toLocaleDateString() : '';
+      const text = String(res.text || '').trim();
+      const subject = String(res.userInput || '').trim();
+
+      const customSignalFallbackMap = [
+        { key: '社恐', value: '社交电量告急' },
+        { key: '加班', value: '加班到灵魂掉线' },
+        { key: '老板', value: '老板语音暴击' },
+        { key: '朋友', value: '友情信号抖动' },
+        { key: '失恋', value: '心跳系统宕机' }
+      ];
+
+      let displayText = '';
+      if (res.templateId === 'custom-signal') {
+        const content = String(res.content || '').trim();
+        displayText = content;
+        if (!displayText) {
+          const hit = customSignalFallbackMap.find(x => subject.includes(x.key));
+          displayText = hit ? hit.value : '';
+        }
+        if (!displayText) displayText = text;
+        if (!displayText) displayText = subject;
+      } else {
+        displayText = text;
+        if (!displayText) displayText = subject;
       }
+      if (displayText.length > 16) displayText = displayText.slice(0, 16);
+
+      this.setData({ timestampStr: ts, displayText });
     }
   },
   methods: {

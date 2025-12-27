@@ -130,6 +130,7 @@ def _ensure_business_schema(db) -> None:
                 template_id VARCHAR(64) NOT NULL,
                 user_input TEXT NULL,
                 ai_text TEXT NULL,
+                content TEXT NULL,
                 rarity ENUM('N','R','SR','SSR') NOT NULL,
                 luck_score INT NOT NULL,
                 image_url VARCHAR(500) NULL,
@@ -145,6 +146,24 @@ def _ensure_business_schema(db) -> None:
             """
         )
     )
+
+    try:
+        has_content = db.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'affectlab_emotion_card_record'
+                  AND COLUMN_NAME = 'content'
+                """
+            )
+        ).scalar()
+        if not int(has_content or 0):
+            db.execute(text("ALTER TABLE affectlab_emotion_card_record ADD COLUMN content TEXT NULL AFTER ai_text"))
+    except Exception:
+        pass
+
     db.commit()
     _BUSINESS_SCHEMA_READY = True
 
@@ -182,7 +201,7 @@ def _deepseek_chat(messages: list[dict], model: str = "deepseek-chat") -> str | 
     started_at = time.time()
     try:
         r = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            "https://api.deepseek.com/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             data=json.dumps(
                 {
@@ -256,6 +275,87 @@ def _shorten_text(s: str, max_len: int = 40) -> str:
     if len(s2) <= max_len:
         return s2
     return s2[:max_len].rstrip()
+
+
+def _generate_short_content(subject: str, template_id: str, template_title: str, template_category: str, rarity: str) -> str | None:
+    subject2 = _shorten_text(subject or "", max_len=60)
+    if not subject2:
+        return None
+    rarity2 = _shorten_text(rarity or "", max_len=8)
+
+    intensity = {
+        "N": "低强度：更温和，像状态提示",
+        "R": "中低强度：轻度吐槽/调侃，但不攻击人",
+        "SR": "中高强度：更利落更带梗，像系统告警/异常回执",
+        "SSR": "高强度：警报级、封神、反差梗更强，但不攻击人",
+    }.get(str(rarity2).upper(), "低强度：更温和，像状态提示")
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是「赛博情绪实验室」的文案引擎。任务：根据用户输入的 subject（主题）生成一条卡片短文案，作为“信号回执”。"
+                f"强度：{intensity}（稀有度={rarity2}）。"
+                "风格：必须是赛博/系统/信号氛围，像系统提示/回执/告警/状态变更，不要鸡汤，不要励志口号。"
+                "硬规则（全部必须满足）："
+                "1) 只输出一行中文短句，16字以内；不要引号、不要解释、不要 emoji；"
+                "2) 必须紧扣 subject 的具体信息：从 subject 里提取 1~2 个具体元素（人/事/物/动作/情绪），并在输出中体现（可同义替换，但不能空泛）；"
+                "3) 输出必须像“系统回执/日志”一句话：简短、有动作或状态（已接收/失败/过载/回滚/重试/降级等）；"
+                "4) 必须包含至少一个赛博词根：信号/系统/心跳/缓存/权限/告警/断连/重启/过载/掉线/降噪/回滚/补丁/指令/通道/回执/同步；"
+                "5) 禁止辱骂、人身攻击、违法暗示。"
+                "输出形式（从中任选一种，更像产品）："
+                "A) 告警:…  B) 回执:…  C) 状态:…  D) 指令:…  E) 系统:…"
+                "强度细则："
+                "N：更克制（偏 状态/回执），少用感叹号；"
+                "R：轻度玩梗（偏 回执/指令），但别阴阳怪气到攻击人；"
+                "SR：更利落更有“异常感”（偏 告警/断连/降噪/回滚）；"
+                "SSR：警报级更带梗但不失真（可用更强词：红色告警/权限拒绝/核心崩溃/强制回滚）。"
+                "自检：如果不含赛博词根/不贴合subject/超过16字，必须重写后再输出。"
+                "示例(仅示例，不可照抄)："
+                "老板又加班 -> 加班指令已接收"
+                "社恐要去聚会 -> 社交通道降噪失败"
+                "被已读不回 -> 回执丢失，重试中"
+                "失恋了 -> 心跳系统回滚中"
+            ),
+        },
+        {"role": "user", "content": f"subject：{subject2}\n请输出信号回执："},
+    ]
+    content = _deepseek_chat(messages, model=os.getenv("AFFECTLAB_CONTENT_MODEL", "deepseek-chat"))
+    if not content:
+        content = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
+        if not content:
+            return None
+    content2 = (content or "").replace("\n", " ").replace("\r", " ").replace('"', "").replace("“", "").replace("”", "").strip()
+    if not content2:
+        return None
+    keywords = ("信号", "系统", "心跳", "缓存", "权限", "告警", "断连", "重启", "过载", "掉线", "降噪", "回滚", "补丁", "指令", "通道", "回执")
+    if not any(k in content2 for k in keywords):
+        if str(rarity2).upper() in ("SSR", "SR"):
+            content2 = f"告警:{content2}"
+        else:
+            content2 = f"系统:{content2}"
+    return _shorten_text(content2, max_len=16) or None
+
+
+def _fallback_custom_signal_content(subject: str, rarity: str) -> str:
+    s = (subject or "").strip()
+    if not s:
+        return "系统:信号缺失"
+    s = _shorten_text(s, max_len=20)
+    style = str(rarity or "N").upper()
+    if any(k in s for k in ("加班", "熬夜", "通宵", "赶工", "开会")):
+        return "加班指令已接收" if style != "SSR" else "告警:加班循环启动"
+    if any(k in s for k in ("社恐", "聚会", "社交", "面试", "相亲", "见人")):
+        return "社交通道降噪失败" if style != "SSR" else "告警:社交协议过载"
+    if any(k in s for k in ("失恋", "分手", "心碎", "拉黑", "前任")):
+        return "心跳系统回滚中" if style != "SSR" else "告警:心跳异常回滚"
+    if any(k in s for k in ("已读不回", "不回", "被鸽", "冷暴力", "消息")):
+        return "回执丢失，重试中" if style != "SSR" else "告警:回执持续丢失"
+    if any(k in s for k in ("焦虑", "崩溃", "抑郁", "难受", "emo")):
+        return "系统过载，降噪中" if style != "SSR" else "告警:情绪过载掉线"
+    if any(k in s for k in ("电量", "没力气", "困", "累", "低能量")):
+        return "系统电量告警" if style != "SSR" else "告警:电量濒临掉线"
+    return "系统:信号已接收" if style in ("N", "R") else "信号已接收，处理中"
 
 
 def _pick_rarity() -> tuple[str, int]:
@@ -556,7 +656,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     tpl = db.execute(
         text(
             """
-            SELECT template_id, title, cost, preset_texts, assets
+            SELECT template_id, title, category, cost, preset_texts, assets
             FROM affectlab_emotion_template
             WHERE template_id = :tid AND status = 'active'
             LIMIT 1
@@ -579,6 +679,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     luck_score = 0
     image_url = ""
     ai_text = ""
+    content_text = None
     filter_seed = 0
     try:
         if req.free:
@@ -603,6 +704,17 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
         rarity, luck_score = _pick_rarity()
         if req.free and rarity in ("N", "R"):
             rarity, luck_score = _pick_reroll_rarity()
+
+        if req.templateId == "custom-signal":
+            content_text = _generate_short_content(
+                user_input,
+                req.templateId,
+                template_title=str(tpl.get("title") or ""),
+                template_category=str(tpl.get("category") or ""),
+                rarity=rarity,
+            )
+            if not content_text:
+                content_text = _fallback_custom_signal_content(user_input, rarity)
         assets = tpl.get("assets")
         if isinstance(assets, str):
             try:
@@ -627,17 +739,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
                 ai_text = str(random.choice(preset_texts))
 
             if not ai_text:
-                messages = [
-                    {
-                        "role": "system",
-                        "content": "你是赛博情绪实验室的文案引擎。根据模板主题和用户输入生成一句中文短句（<=40字），风格偏互联网嘴替，直接输出短句，不要解释。",
-                    },
-                    {"role": "user", "content": f"模板：{tpl.get('title')}\n用户输入：{user_input}"},
-                ]
-                try:
-                    ai_text = _modelscope_chat(messages, model=os.getenv("AFFECTLAB_TEXT_MODEL", "Qwen/Qwen3-8B-Instruct"))
-                except Exception:
-                    ai_text = None
+                ai_text = user_input
 
         if not ai_text:
             logger.info(
@@ -654,9 +756,9 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
             text(
                 """
                 INSERT INTO affectlab_emotion_card_record
-                (record_id, user_id, template_id, user_input, ai_text, rarity, luck_score, image_url, cost_points, meta)
+                (record_id, user_id, template_id, user_input, ai_text, content, rarity, luck_score, image_url, cost_points, meta)
                 VALUES
-                (:rid, :uid, :tid, :uin, :txt, :rar, :score, :img, :cost, :meta)
+                (:rid, :uid, :tid, :uin, :txt, :content, :rar, :score, :img, :cost, :meta)
                 """
             ),
             {
@@ -665,6 +767,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
                 "tid": req.templateId,
                 "uin": user_input,
                 "txt": ai_text,
+                "content": content_text,
                 "rar": rarity,
                 "score": int(luck_score),
                 "img": image_url,
@@ -700,6 +803,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
         "templateId": req.templateId,
         "imageUrl": image_url,
         "text": ai_text,
+        "content": content_text or "",
         "userInput": user_input,
         "timestamp": int(time.time() * 1000),
         "rarity": rarity,
@@ -718,7 +822,7 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
         db.execute(
             text(
                 """
-                SELECT record_id, template_id, user_input, ai_text, rarity, luck_score, image_url, meta, created_at
+                SELECT record_id, template_id, user_input, ai_text, content, rarity, luck_score, image_url, meta, created_at
                 FROM affectlab_emotion_card_record
                 WHERE user_id = :uid
                 ORDER BY created_at DESC, id DESC
@@ -743,15 +847,16 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
         except Exception:
             filter_seed = 0
         items.append(
-            {
-                "id": r["record_id"],
-                "templateId": r["template_id"],
-                "imageUrl": r.get("image_url") or "",
-                "text": r.get("ai_text") or "",
-                "userInput": r.get("user_input") or "",
-                "timestamp": ts,
-                "rarity": r.get("rarity") or "N",
-                "filterSeed": filter_seed,
+                    {
+                        "id": r["record_id"],
+                        "templateId": r["template_id"],
+                        "imageUrl": r.get("image_url") or "",
+                        "text": r.get("ai_text") or "",
+                        "content": r.get("content") or "",
+                        "userInput": r.get("user_input") or "",
+                        "timestamp": ts,
+                        "rarity": r.get("rarity") or "N",
+                        "filterSeed": filter_seed,
                 "luckScore": int(r.get("luck_score") or 0),
             }
         )

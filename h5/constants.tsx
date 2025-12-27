@@ -470,7 +470,7 @@ export const TEMPLATES: Template[] = [
     subtitle: 'Custom Signal',
     tag: 'HOT',
     imageUrl: TEMPLATE_ASSETS['custom-signal']['SSR'],
-    cost: 5,
+    cost: 3,
     category: 'future',
     inputHint: '输入任何你想说的话...',
     quickPrompts: ['发疯', '许愿', '吐槽', '告白'],

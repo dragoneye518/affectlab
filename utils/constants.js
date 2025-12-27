@@ -434,10 +434,10 @@ const TEMPLATES = [
     subtitle: 'Signal Decode',
     tag: 'NEW',
     imageUrl: TEMPLATE_ASSETS['custom-signal']['SSR'],
-    cost: 1,
+    cost: 3,
     category: 'future',
     inputHint: '输入任意内容',
-    quickPrompts: ['焦虑', '委屈', '暴躁', '心动', '摆烂', '内耗', '社恐', '空虚'],
+    quickPrompts: ['社恐不敢说话', '加班到崩溃', '被老板批评', '和朋友吵架', '失恋难过'],
     description: '通用信号转译模块。',
     keywords: ['通用', '转译', '信号'],
     presetTexts: []

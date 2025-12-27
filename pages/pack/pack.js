@@ -47,7 +47,20 @@ Page({
           const items = res?.data?.data?.items;
           if (res.statusCode === 200 && Array.isArray(items)) {
             for (const item of items) {
-              item.dateStr = new Date(item.timestamp).toLocaleDateString();
+              const ts = item && item.timestamp ? item.timestamp : Date.now();
+              item.dateStr = new Date(ts).toLocaleDateString();
+
+              const text = String(item.text || '').trim();
+              const userInput = String(item.userInput || '').trim();
+              let displayText = '';
+              if (item.templateId === 'custom-signal') {
+                const content = String(item.content || '').trim();
+                displayText = content || text || userInput;
+              } else {
+                displayText = text || userInput;
+              }
+              if (displayText.length > 16) displayText = displayText.slice(0, 16);
+              item.text = displayText;
             }
             this.setData({ history: items });
           } else {

@@ -78,7 +78,7 @@
               <!-- Text Content -->
               <view class="px-2">
                   <text class="font-serif text-2xl font-bold text-black leading-tight mb-4 tracking-tight block">
-                      "{{result.text}}"
+                      "{{displayText}}"
                   </text>
                   <view class="flex justify-between items-end border-t-2 border-black pt-2">
                       <view class="flex flex-col">

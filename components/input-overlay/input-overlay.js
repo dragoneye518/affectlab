@@ -1,4 +1,4 @@
-import { polishTextWithDeepSeek, fetchAffectLabTemplates } from '../../utils/api';
+import { fetchAffectLabTemplates } from '../../utils/api';
 
 Component({
   options: {
@@ -19,6 +19,7 @@ Component({
     isAnimating: false,
     isPolishing: false,
     polishOptions: null,
+    polishStyle: '',
     recommendedId: null,
     recommendedTemplateName: '',
     shouldFocus: false,
@@ -50,42 +51,26 @@ Component({
     },
     async handleAIPolish() {
       if (!this.data.input.trim() || this.data.isPolishing) return;
-      
-      this.setData({ isPolishing: true, polishOptions: null, recommendedId: null });
-      
-      const result = await polishTextWithDeepSeek(this.data.input);
-      
-      if (!result || !Array.isArray(result.options) || result.options.length === 0) {
-        wx.showToast({ title: 'AI 转译失败，无可用数据', icon: 'none' });
-        this.setData({ isPolishing: false });
-        return;
-      }
+      if (!this.properties.template || this.properties.template.id !== 'custom-signal') return;
 
-      if (result) {
-        let recommendedId = null;
-        let recommendedTemplateName = '';
-        
-        if (result.recommendedTemplateId && result.recommendedTemplateId !== this.properties.template.id) {
-           const templates = await fetchAffectLabTemplates();
-           const exists = templates.find(t => t.id === result.recommendedTemplateId);
-           if (exists) {
-             recommendedId = exists.id;
-             recommendedTemplateName = exists.title;
-           }
-        }
-        
-        this.setData({
-          polishOptions: result.options,
-          recommendedId,
-          recommendedTemplateName
-        });
-      }
-      this.setData({ isPolishing: false });
+      this.setData({ isPolishing: true, polishOptions: null, recommendedId: null, polishStyle: '' });
+
+      const raw = this.data.input.trim();
+      const opts = [
+        { style: 'TOXIC', text: `${raw}？笑死，我先跑路` },
+        { style: 'EMO', text: `${raw}。夜色替我说完了` },
+        { style: 'GLITCH', text: `${raw} // SIGNAL_LOST_404` },
+        { style: 'ZEN', text: `${raw}。先把呼吸调成静音` },
+        { style: 'RAGE', text: `${raw}。我宣布：别惹我` }
+      ].map(o => ({ style: o.style, text: String(o.text || '').slice(0, 50) }));
+
+      this.setData({ polishOptions: opts, isPolishing: false });
     },
     onSelectOption(e) {
       this.setData({ 
         input: e.currentTarget.dataset.text,
         polishOptions: null,
+        polishStyle: e.currentTarget.dataset.style || '',
         shouldFocus: true
       });
     },
@@ -97,7 +82,7 @@ Component({
     handleConfirm() {
       this.setData({ isAnimating: true });
       setTimeout(() => {
-        this.triggerEvent('confirm', { text: this.data.input || "无题" });
+        this.triggerEvent('confirm', { text: this.data.input || "无题", polishStyle: this.data.polishStyle || '' });
       }, 800);
     }
   }
