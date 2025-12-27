@@ -636,11 +636,26 @@ def transactions(
         db.execute(
             text(
                 """
-                SELECT id, amount, type, reason, project_id, balance_after, created_at
-                FROM user_transactions
-                WHERE user_id = :uid
-                  AND (:t = '' OR type = :t)
-                ORDER BY created_at DESC, id DESC
+                SELECT
+                  ut.id,
+                  ut.amount,
+                  ut.type,
+                  ut.reason,
+                  ut.project_id,
+                  ut.balance_after,
+                  ut.created_at,
+                  COALESCE(cr.template_id, tpl2.template_id) AS template_id,
+                  COALESCE(tpl1.title, tpl2.title) AS template_title
+                FROM user_transactions ut
+                LEFT JOIN affectlab_emotion_card_record cr
+                  ON ut.type = 'CONSUME' AND ut.project_id = cr.record_id
+                LEFT JOIN affectlab_emotion_template tpl1
+                  ON cr.template_id = tpl1.template_id
+                LEFT JOIN affectlab_emotion_template tpl2
+                  ON ut.type = 'RECHARGE' AND ut.reason = 'AD_REROLL' AND ut.project_id = tpl2.template_id
+                WHERE ut.user_id = :uid
+                  AND (:t = '' OR ut.type = :t)
+                ORDER BY ut.created_at DESC, ut.id DESC
                 LIMIT :lim OFFSET :off
                 """
             ),
@@ -699,7 +714,7 @@ def reward_ad(req: RewardRequest, request: Request, db=Depends(get_db)):
 
     amount = ad_amount
     reason = "AD"
-    project_id = None
+    project_id = scene or None
 
     if scene == "REROLL":
         tid = (req.templateId or "").strip()

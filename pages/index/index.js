@@ -25,6 +25,7 @@ Page({
     showSignIn: false,
     showAd: false,
     adType: 'CANDY',
+    adScene: 'HOME_NAV',
     showCategory: false,
     
     // Filters
@@ -425,7 +426,7 @@ Page({
 
     if (wx.getStorageSync('cp_open_ad_on_load')) {
       wx.removeStorageSync('cp_open_ad_on_load');
-      this.onWatchAd();
+      this.openCandyAd('PROFILE');
     }
 
     this.refreshBalanceFromServer();
@@ -549,7 +550,12 @@ Page({
   },
 
   onWatchAd() {
-    this.setData({ adType: 'CANDY', showAd: true, adTimeLeft: 5 });
+    this.openCandyAd('HOME_NAV');
+  },
+
+  openCandyAd(scene) {
+    const s = String(scene || '').trim().toUpperCase();
+    this.setData({ adType: 'CANDY', adScene: s || 'HOME_NAV', showAd: true, adTimeLeft: 5 });
     this.startAdTimer();
   },
   
@@ -568,7 +574,7 @@ Page({
     clearInterval(this.adTimer);
     this.setData({ showAd: false });
     if (this.data.adType === 'CANDY') {
-      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { scene: 'CANDY' } })
+      requestAffectLab({ path: '/user/reward/ad', method: 'POST', data: { scene: this.data.adScene || 'HOME_NAV' } })
         .then((res) => {
           const bal = res?.data?.data?.balance;
           const amt = res?.data?.data?.amount;
@@ -643,8 +649,8 @@ Page({
     }
     
     if (candyCount < selectedTemplate.cost) {
-      this.setData({ isInputting: false, adType: 'CANDY', showAd: true, adTimeLeft: 5 });
-      this.startAdTimer();
+      this.setData({ isInputting: false });
+      this.openCandyAd('INSUFFICIENT');
       wx.showToast({ title: '糖果不足，看广告补充', icon: 'none' });
       return;
     }

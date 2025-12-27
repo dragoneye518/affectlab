@@ -89,6 +89,10 @@ Page({
     wx.navigateTo({ url: '/pages/ledger/ledger?mode=debit' });
   },
 
+  goPack() {
+    wx.switchTab({ url: '/pages/pack/pack' });
+  },
+
   onOpenDaily() {
     if (!this.data.canClaimDaily) return;
     if (!getAffectLabToken()) return;

@@ -38,6 +38,16 @@ Page({
     return reason ? String(reason) : '';
   },
 
+  mapAdScene(scene) {
+    const s = String(scene || '').toUpperCase();
+    if (!s) return '';
+    if (s === 'HOME_NAV' || s === 'HOME') return '首页顶部';
+    if (s === 'PROFILE' || s === 'MINE') return '我的页';
+    if (s === 'INSUFFICIENT') return '算力不足补给';
+    if (s === 'CANDY') return '未知入口';
+    return s;
+  },
+
   onLoad(options) {
     const app = getApp();
     if (app.globalData && app.globalData.totalHeaderHeight) {
@@ -137,9 +147,19 @@ Page({
         const ts = it.created_at ? new Date(it.created_at).getTime() : Date.now();
         const amount = Number(it.amount || 0);
         const typeCN = this.mapTxType(it.type);
+        const reasonKey = String(it.reason || '').toUpperCase();
         const reasonCN = this.mapTxReason(it.reason);
-        const title = reasonCN ? `${typeCN} · ${reasonCN}` : typeCN;
-        const sub = new Date(ts).toLocaleString();
+        const when = new Date(ts).toLocaleString();
+        const tpl = (it.template_title || it.template_id || '').trim();
+        const scene = reasonKey === 'AD' ? this.mapAdScene(it.project_id) : '';
+        const titleParts = [];
+        if (scene) titleParts.push(scene);
+        if (tpl && (typeCN === '消费' || reasonKey === 'AD_REROLL')) titleParts.push(tpl);
+        const title = titleParts.length ? `${typeCN} · ${reasonCN}（${titleParts.join(' · ')}）` : reasonCN ? `${typeCN} · ${reasonCN}` : typeCN;
+        const detail = [];
+        if (scene) detail.push(`入口：${scene}`);
+        if (tpl) detail.push(`模板：${tpl}`);
+        const sub = detail.length ? `${detail.join(' · ')} · ${when}` : when;
         return { id: String(it.id), ts, type: it.type, amount, title, sub };
       });
 
