@@ -645,7 +645,8 @@ def transactions(
                   ut.balance_after,
                   ut.created_at,
                   COALESCE(cr.template_id, tpl2.template_id) AS template_id,
-                  COALESCE(tpl1.title, tpl2.title) AS template_title
+                  COALESCE(tpl1.title, tpl2.title) AS template_title,
+                  COALESCE(tpl1.category, tpl2.category) AS template_category
                 FROM user_transactions ut
                 LEFT JOIN affectlab_emotion_card_record cr
                   ON ut.type = 'CONSUME' AND ut.project_id = cr.record_id

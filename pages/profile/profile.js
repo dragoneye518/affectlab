@@ -39,12 +39,22 @@ Page({
 
       requestAffectLab({ path: '/user/me', method: 'GET' })
         .then((res) => {
-          const bal = res?.data?.data?.balance?.balance;
-          const lastDailyDate = res?.data?.data?.balance?.last_daily_date;
+          const b = res?.data?.data?.balance || {};
+          const bal = b?.balance;
+          const lastDailyDate = b?.last_daily_date;
+          const totalRecharge = Number(b?.total_recharge);
+          const totalConsume = Number(b?.total_consume);
           if (typeof bal === 'number') {
             this.setData({ candyCount: bal });
           }
           this.setData({ canClaimDaily: lastDailyDate !== today });
+          this.setData({
+            summary: {
+              ...this.data.summary,
+              totalCredit: Number.isFinite(totalRecharge) ? totalRecharge : this.data.summary.totalCredit,
+              totalDebit: Number.isFinite(totalConsume) ? totalConsume : this.data.summary.totalDebit
+            }
+          });
         })
         .catch(() => {
           wx.showToast({ title: '加载失败，无可用数据', icon: 'none' });
@@ -54,26 +64,22 @@ Page({
         .then((res) => {
           const items = res?.data?.data?.items;
           if (!Array.isArray(items)) {
-            this.setData({ summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 } });
+            this.setData({ summary: { ...this.data.summary, adCount: 0, dailyCount: 0, generateCount: 0 } });
             return;
           }
-          let totalCredit = 0;
-          let totalDebit = 0;
+          const capped = items.slice(0, 200);
           let adCount = 0;
           let dailyCount = 0;
           let generateCount = 0;
-          for (const it of items) {
-            const amt = Number(it.amount || 0);
-            if (amt > 0) totalCredit += amt;
-            if (amt < 0) totalDebit += Math.abs(amt);
+          for (const it of capped) {
             if (it.reason === 'AD' || it.reason === 'AD_REROLL') adCount += 1;
             if (it.reason === 'DAILY') dailyCount += 1;
             if (it.type === 'CONSUME') generateCount += 1;
           }
-          this.setData({ summary: { totalCredit, totalDebit, adCount, dailyCount, generateCount } });
+          this.setData({ summary: { ...this.data.summary, adCount, dailyCount, generateCount } });
         })
         .catch(() => {
-          this.setData({ summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 } });
+          this.setData({ summary: { ...this.data.summary, adCount: 0, dailyCount: 0, generateCount: 0 } });
           wx.showToast({ title: '明细加载失败，无可用数据', icon: 'none' });
         });
     };

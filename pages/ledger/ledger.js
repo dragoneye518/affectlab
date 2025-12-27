@@ -33,9 +33,19 @@ Page({
     if (r === 'DAILY') return '每日补给';
     if (r === 'AD') return '广告补给';
     if (r === 'AD_REROLL') return '广告重抽补贴';
-    if (r === 'GENERATE') return '生成情绪卡';
+    if (r === 'GENERATE') return '生成';
     if (r === 'REROLL_GENERATE') return '重抽生成';
     return reason ? String(reason) : '';
+  },
+
+  mapTemplateCategory(cat) {
+    const c = String(cat || '').toLowerCase();
+    if (!c) return '';
+    if (c === 'lucky') return '能量指南';
+    if (c === 'sharp') return '高情商嘴替';
+    if (c === 'persona') return '社交人设';
+    if (c === 'future') return '2026 未来';
+    return cat ? String(cat) : '';
   },
 
   mapAdScene(scene) {
@@ -151,14 +161,15 @@ Page({
         const reasonCN = this.mapTxReason(it.reason);
         const when = new Date(ts).toLocaleString();
         const tpl = (it.template_title || it.template_id || '').trim();
+        const cat = this.mapTemplateCategory(it.template_category);
         const scene = reasonKey === 'AD' ? this.mapAdScene(it.project_id) : '';
         const titleParts = [];
         if (scene) titleParts.push(scene);
-        if (tpl && (typeCN === '消费' || reasonKey === 'AD_REROLL')) titleParts.push(tpl);
+        if (tpl && (typeCN === '消费' || reasonKey === 'AD_REROLL')) titleParts.push(cat ? `${cat} · ${tpl}` : tpl);
         const title = titleParts.length ? `${typeCN} · ${reasonCN}（${titleParts.join(' · ')}）` : reasonCN ? `${typeCN} · ${reasonCN}` : typeCN;
         const detail = [];
         if (scene) detail.push(`入口：${scene}`);
-        if (tpl) detail.push(`模板：${tpl}`);
+        if (tpl) detail.push(`模板：${cat ? `${cat} · ${tpl}` : tpl}`);
         const sub = detail.length ? `${detail.join(' · ')} · ${when}` : when;
         return { id: String(it.id), ts, type: it.type, amount, title, sub };
       });
