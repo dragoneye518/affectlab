@@ -2,13 +2,20 @@ import { requestAffectLab, getAffectLabToken, affectLabLogin } from '../../utils
 
 const _defaultAvatarUrl = 'https://api.iconify.design/lucide:user.svg?color=%2300ff00';
 
+const _toMax6 = (raw) => {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (s.length <= 6) return s;
+  return `${s.slice(0, 5)}…`;
+};
+
 const _buildUserDisplayName = ({ nick, openid }) => {
   const n = String(nick || '').trim();
-  if (n && !/^user_/i.test(n)) return `赛博用户：${n}`;
+  if (n && !/^user_/i.test(n)) return _toMax6(n);
   const oid = String(openid || '');
   const suffix = oid ? oid.slice(-6) : '';
-  if (suffix) return `微信用户${suffix}`;
-  return '微信用户';
+  if (suffix) return suffix;
+  return '匿名';
 };
 
 Page({
@@ -20,7 +27,7 @@ Page({
     menuButtonWidth: 90,
     canClaimDaily: false,
     summary: { totalCredit: 0, totalDebit: 0, adCount: 0, dailyCount: 0, generateCount: 0 },
-    userDisplayName: '微信用户',
+    userDisplayName: '匿名',
     userAvatarUrl: _defaultAvatarUrl
   },
 

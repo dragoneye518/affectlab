@@ -64,9 +64,9 @@
         </scroll-view>
       </view>
 
-      <view class="flex items-center justify-between mb-6">
+      <view class="flex items-center justify-between mt-4 mb-3">
         <view class="flex items-center gap-2">
-          <text class="text-xs text-gray-500 tracking-widest uppercase font-bold">生成记录</text>
+          <text class="text-xs text-gray-500 tracking-widest uppercase font-bold">卡片列表</text>
         </view>
         <text class="text-sm font-normal text-gray-500">{{items.length}}/{{total}}</text>
       </view>
