@@ -673,7 +673,7 @@ const InputOverlay = ({
 
                 {/* Quick Prompts (Only show if no AI options) */}
                 {!polishOptions && template.quickPrompts && template.quickPrompts.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
+                    <div className="flex flex-wrap gap-2 mt-4 mb-2">
                         {template.quickPrompts.map(prompt => (
                             <button
                                 key={prompt}
@@ -688,7 +688,7 @@ const InputOverlay = ({
 
                 {/* AI Options Display */}
                 {polishOptions && (
-                    <div className="space-y-2 mb-2 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="space-y-2 mt-4 mb-2 animate-in fade-in slide-in-from-bottom-2">
                         <label className="text-xs text-neon-green font-bold flex items-center gap-1">
                             <Sparkles size={10} /> DECODED SIGNALS (Select one):
                         </label>
