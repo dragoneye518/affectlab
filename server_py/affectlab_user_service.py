@@ -485,6 +485,8 @@ def login(req: LoginRequest, db=Depends(get_db)):
 
     openid = res.get("openid")
     logger.info("REMOTE wechat jscode2session ok ms=%s openid=%s", ms, _mask_openid(openid))
+    if not openid:
+        raise HTTPException(status_code=500, detail="WeChat openid missing")
 
     tpa = db.execute(
         text(f"SELECT user_id FROM {third_party_table} WHERE open_id = :oid LIMIT 1"),
@@ -604,15 +606,34 @@ def transactions(request: Request, limit: int = 50, offset: int = 0, db=Depends(
 @router.post("/affectlab/api/user/reward/daily")
 def claim_daily(request: Request, db=Depends(get_db)):
     user_id = get_current_user_id(request)
-    today = datetime.datetime.utcnow().date().isoformat()
+    tz = datetime.timezone(datetime.timedelta(hours=8))
+    today = datetime.datetime.now(tz).date().isoformat()
     rec = _get_balance_for_update(db, user_id)
     if rec.get("last_daily_date") == today:
         logger.info("DB write daily reward denied user_id=%s date=%s", int(user_id or 0), today)
         raise HTTPException(status_code=400, detail="Already claimed")
-    next_balance = recharge_points_internal(db, user_id, 10, "DAILY")
+    curr = int(rec.get("balance") or 0)
+    next_balance = curr + 10
     db.execute(
-        text("UPDATE affectlab_user_balance SET last_daily_date = :d WHERE user_id = :uid"),
-        {"d": today, "uid": user_id},
+        text(
+            """
+            UPDATE affectlab_user_balance
+            SET balance = :bal,
+                total_recharge = total_recharge + 10,
+                last_daily_date = :d
+            WHERE user_id = :uid
+            """
+        ),
+        {"bal": next_balance, "d": today, "uid": user_id},
+    )
+    _insert_user_transaction(
+        db,
+        user_id=user_id,
+        amount=10,
+        tx_type="RECHARGE",
+        reason="DAILY",
+        project_id=None,
+        balance_after=next_balance,
     )
     db.commit()
     logger.info("DB write daily reward user_id=%s date=%s balance_after=%s", int(user_id or 0), today, int(next_balance or 0))

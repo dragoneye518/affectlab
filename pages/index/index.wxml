@@ -277,6 +277,7 @@
   <block wx:if="{{view === 'RESULT' && generatedResult}}">
       <result-view 
           result="{{generatedResult}}" 
+          isReadOnly="{{resultReadOnly}}"
           bind:close="closeResult" 
           bind:reroll="startReroll" 
           bind:share="onShowShareOverlay"

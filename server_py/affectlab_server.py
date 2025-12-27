@@ -191,6 +191,12 @@ def _pick_rarity() -> tuple[str, int]:
         return "R", 60 + int(random.random() * 20)
     return "N", int(random.random() * 60)
 
+def _pick_reroll_rarity() -> tuple[str, int]:
+    rand = random.random()
+    if rand > 0.65:
+        return "SSR", 95 + int(random.random() * 6)
+    return "SR", 80 + int(random.random() * 15)
+
 
 def _parse_js_assets(constants_path: str) -> dict:
     if not os.path.exists(constants_path):
@@ -384,17 +390,26 @@ def text_polish(req: TextPolishRequest, request: Request, db=Depends(get_db)):
         content = None
 
     if not content:
-        raise HTTPException(status_code=503, detail="AI service unavailable")
+        s = _shorten_text(prompt, max_len=34)
+        return {
+            "options": [
+                {"style": "TOXIC", "text": _shorten_text(f"{s}？笑死，我先跑路", max_len=40)},
+                {"style": "EMO", "text": _shorten_text(f"{s}。夜色替我说完了", max_len=40)},
+                {"style": "GLITCH", "text": _shorten_text(f"{s} // SIGNAL_LOST_404", max_len=40)},
+            ],
+            "recommendedTemplateId": None,
+        }
 
     try:
         parsed = json.loads(content)
         return parsed
     except Exception:
+        base = _shorten_text(prompt, max_len=34)
         return {
             "options": [
-                {"style": "TOXIC", "text": _shorten_text(content)},
-                {"style": "EMO", "text": _shorten_text(content)},
-                {"style": "GLITCH", "text": _shorten_text(content)},
+                {"style": "TOXIC", "text": _shorten_text(f"{base}，但我不装了", max_len=40)},
+                {"style": "EMO", "text": _shorten_text(f"{base}。把叹气交给风", max_len=40)},
+                {"style": "GLITCH", "text": _shorten_text(f"{base} :: ERR_EMO_0x01", max_len=40)},
             ],
             "recommendedTemplateId": None,
         }
@@ -473,12 +488,14 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
     cost = int(tpl.get("cost") or 1)
     record_id = f"al_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
     cost_points = 0 if req.free else cost
+    balance_after = None
     if req.free:
         db.execute(
             text("INSERT IGNORE INTO affectlab_user_balance(user_id, balance) VALUES (:uid, 0)"),
             {"uid": user_id},
         )
         bal = db.execute(text("SELECT balance FROM affectlab_user_balance WHERE user_id = :uid"), {"uid": user_id}).scalar()
+        balance_after = int(bal or 0)
         _insert_user_transaction(
             db,
             user_id=user_id,
@@ -486,17 +503,19 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
             tx_type="REROLL",
             reason="AD",
             project_id=record_id,
-            balance_after=int(bal or 0),
+            balance_after=balance_after,
         )
         db.commit()
     else:
-        deduct_points_internal(db, user_id, cost, reason="GENERATE", project_id=record_id)
+        balance_after = deduct_points_internal(db, user_id, cost, reason="GENERATE", project_id=record_id)
 
     user_input = (req.userInput or "").strip()
     if not user_input:
         raise HTTPException(status_code=400, detail="Empty userInput")
 
     rarity, luck_score = _pick_rarity()
+    if req.free and rarity in ("N", "R"):
+        rarity, luck_score = _pick_reroll_rarity()
     assets = tpl.get("assets")
     if isinstance(assets, str):
         try:
@@ -582,7 +601,7 @@ def generate_card(req: GenerateRequest, request: Request, db=Depends(get_db)):
         "filterSeed": filter_seed,
         "luckScore": int(luck_score),
     }
-    return {"code": 200, "data": {"result": result}}
+    return {"code": 200, "data": {"result": result, "balance": int(balance_after or 0)}}
 
 
 @app.get("/affectlab/api/cards")
@@ -594,7 +613,7 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
         db.execute(
             text(
                 """
-                SELECT record_id, template_id, user_input, ai_text, rarity, luck_score, image_url, created_at
+                SELECT record_id, template_id, user_input, ai_text, rarity, luck_score, image_url, meta, created_at
                 FROM affectlab_emotion_card_record
                 WHERE user_id = :uid
                 ORDER BY created_at DESC, id DESC
@@ -609,6 +628,15 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
     items = []
     for r in rows:
         ts = int(r["created_at"].timestamp() * 1000) if r.get("created_at") else int(time.time() * 1000)
+        filter_seed = 0
+        try:
+            meta = r.get("meta")
+            if meta:
+                m = json.loads(meta) if isinstance(meta, str) else meta
+                if isinstance(m, dict) and "filterSeed" in m:
+                    filter_seed = int(m.get("filterSeed") or 0)
+        except Exception:
+            filter_seed = 0
         items.append(
             {
                 "id": r["record_id"],
@@ -618,7 +646,7 @@ def list_cards(request: Request, limit: int = 50, offset: int = 0, db=Depends(ge
                 "userInput": r.get("user_input") or "",
                 "timestamp": ts,
                 "rarity": r.get("rarity") or "N",
-                "filterSeed": 0,
+                "filterSeed": filter_seed,
                 "luckScore": int(r.get("luck_score") or 0),
             }
         )

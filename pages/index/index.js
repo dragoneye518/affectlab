@@ -19,6 +19,7 @@ Page({
     
     // Results
     generatedResult: null,
+    resultReadOnly: false,
     
     // Overlays
     showSignIn: false,
@@ -178,7 +179,7 @@ Page({
     const lastOpened = wx.getStorageSync('cp_last_opened_result');
     if (lastOpened) {
       lastOpened.dateStr = new Date(lastOpened.timestamp).toLocaleDateString();
-      this.setData({ generatedResult: lastOpened, view: 'RESULT' }, () => {
+      this.setData({ generatedResult: lastOpened, view: 'RESULT', resultReadOnly: true }, () => {
         this.hideTabBarSafe();
       });
       wx.removeStorageSync('cp_last_opened_result');
@@ -351,14 +352,17 @@ Page({
 
   onGenerationFinish(e) {
     const res = e.detail.result;
+    const balance = e && e.detail ? e.detail.balance : undefined;
     this.setData({
       generatedResult: res,
       view: 'RESULT',
-      freeGenerateOnce: false
+      resultReadOnly: false,
+      freeGenerateOnce: false,
+      candyCount: typeof balance === 'number' ? balance : this.data.candyCount
     }, () => {
       this.hideTabBarSafe();
     });
-    this.refreshBalanceFromServer();
+    if (typeof balance !== 'number') this.refreshBalanceFromServer();
   },
 
   onGenerationError(e) {
@@ -381,7 +385,7 @@ Page({
   },
   
   closeResult() {
-    this.setData({ view: 'HOME', freeGenerateOnce: false });
+    this.setData({ view: 'HOME', freeGenerateOnce: false, resultReadOnly: false });
     this.showTabBarSafe();
   },
   

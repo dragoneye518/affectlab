@@ -18,6 +18,7 @@ Component({
   },
   lifetimes: {
     attached() {
+      this._requested = false;
       this.startGeneration();
     },
     detached() {
@@ -65,6 +66,8 @@ Component({
       clearTimeout(this.finishTimeout);
     },
     finish() {
+      if (this._requested) return;
+      this._requested = true;
       const { template, userInput, freeGenerateOnce } = this.properties;
       requestAffectLab({
         path: '/cards/generate',
@@ -77,8 +80,9 @@ Component({
             return;
           }
           const result = res?.data?.data?.result;
+          const balance = res?.data?.data?.balance;
           if (res.statusCode === 200 && result) {
-            this.triggerEvent('finish', { result, fromServer: true });
+            this.triggerEvent('finish', { result, balance, fromServer: true });
             return;
           }
           const message = (res && res.data && (res.data.detail || res.data.msg)) || '生成失败，请检查后端服务';
